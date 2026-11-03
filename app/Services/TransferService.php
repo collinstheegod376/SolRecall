@@ -502,6 +502,173 @@ class TransferService
     }
 
     /**
+     * Inspect on-chain transaction history for a user's deposit address
+     * and credit any new confirmed deposits to their available balance.
+     */
+    public function syncUserDeposits(int $userId): int
+    {
+        $user = $this->db->fetch('SELECT solana_deposit_address, username FROM users WHERE id = ?', [$userId]);
+        if (!$user || empty($user['solana_deposit_address'])) {
+            return 0;
+        }
+
+        $depositAddress = trim((string) $user['solana_deposit_address']);
+        $totalCredited = 0;
+
+        try {
+            $signatures = $this->rpcService->getSignaturesForAddress($depositAddress, 10);
+            foreach ($signatures as $sigInfo) {
+                $txSig = is_array($sigInfo) ? ($sigInfo['signature'] ?? '') : (string) $sigInfo;
+                if ($txSig === '') {
+                    continue;
+                }
+
+                // Check if already processed
+                $existing = $this->db->fetch('SELECT id FROM deposits WHERE tx_signature = ?', [$txSig]);
+                if ($existing) {
+                    continue;
+                }
+
+                $err = is_array($sigInfo) ? ($sigInfo['err'] ?? null) : null;
+                if ($err !== null) {
+                    continue; // Skip failed on-chain transactions
+                }
+
+                $txData = $this->rpcService->getTransaction($txSig);
+                if (!$txData) {
+                    continue;
+                }
+
+                $depositDelta = $this->parseDepositDelta($txData, $depositAddress);
+                if (!$depositDelta) {
+                    continue;
+                }
+
+                $token = $depositDelta['token'];
+                $amount = $depositDelta['amount'];
+
+                $credited = (bool) $this->db->transaction(function (Database $db) use ($userId, $token, $amount, $txSig) {
+                    $exists = $db->fetch('SELECT id FROM deposits WHERE tx_signature = ?', [$txSig]);
+                    if ($exists) {
+                        return false;
+                    }
+
+                    $now = date('Y-m-d H:i:s');
+                    $db->execute(
+                        "INSERT INTO deposits (user_id, token, amount, tx_signature, status, created_at, confirmed_at) 
+                         VALUES (?, ?, ?, ?, 'confirmed', ?, ?)",
+                        [$userId, $token, $amount, $txSig, $now, $now]
+                    );
+
+                    $balance = $db->selectForUpdate(
+                        'SELECT available FROM user_balances WHERE user_id = ? AND token = ?',
+                        [$userId, $token]
+                    );
+
+                    if ($balance) {
+                        $db->execute(
+                            'UPDATE user_balances SET available = available + ? WHERE user_id = ? AND token = ?',
+                            [$amount, $userId, $token]
+                        );
+                    } else {
+                        $db->execute(
+                            'INSERT INTO user_balances (user_id, token, available, escrow) VALUES (?, ?, ?, 0)',
+                            [$userId, $token, $amount]
+                        );
+                    }
+                    return true;
+                });
+
+                if ($credited) {
+                    $totalCredited++;
+                }
+            }
+        } catch (\Throwable) {
+            // Non-fatal if Solana RPC is unreachable or throttling
+        }
+
+        return $totalCredited;
+    }
+
+    /**
+     * Parse on-chain balance deltas for a specific deposit address.
+     */
+    protected function parseDepositDelta(array $tx, string $depositAddress): ?array
+    {
+        $meta = $tx['meta'] ?? null;
+        if (!$meta || ($meta['err'] ?? null) !== null) {
+            return null;
+        }
+
+        $usdcMint = (string) config('tokens.USDC.mint', '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
+        $usdtMint = (string) config('tokens.USDT.mint', 'EJwZgeZrdCraqiSCdtXYWhWsvQTxZeQXP3ZvGWcvppgw');
+
+        // 1. Check SPL Token Balances
+        if (!empty($meta['postTokenBalances']) && is_array($meta['postTokenBalances'])) {
+            $preMap = [];
+            if (!empty($meta['preTokenBalances']) && is_array($meta['preTokenBalances'])) {
+                foreach ($meta['preTokenBalances'] as $pre) {
+                    $idx = $pre['accountIndex'] ?? null;
+                    if ($idx !== null) {
+                        $preMap[$idx] = (float) ($pre['uiTokenAmount']['uiAmount'] ?? 0.0);
+                    }
+                }
+            }
+
+            foreach ($meta['postTokenBalances'] as $post) {
+                $owner = $post['owner'] ?? '';
+                if ($owner === $depositAddress) {
+                    $idx = $post['accountIndex'] ?? null;
+                    $preAmount = $preMap[$idx] ?? 0.0;
+                    $postAmount = (float) ($post['uiTokenAmount']['uiAmount'] ?? 0.0);
+                    $delta = $postAmount - $preAmount;
+
+                    if ($delta > 0.000001) {
+                        $mint = $post['mint'] ?? '';
+                        $token = match ($mint) {
+                            $usdcMint => 'USDC',
+                            $usdtMint => 'USDT',
+                            default => null
+                        };
+
+                        if ($token !== null) {
+                            return ['token' => $token, 'amount' => round($delta, 6)];
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Check Native SOL Balances
+        $message = $tx['transaction']['message'] ?? [];
+        $accountKeys = $message['accountKeys'] ?? [];
+        $accountIndex = null;
+
+        foreach ($accountKeys as $idx => $keyInfo) {
+            $pubkey = is_array($keyInfo) ? ($keyInfo['pubkey'] ?? '') : (string) $keyInfo;
+            if ($pubkey === $depositAddress) {
+                $accountIndex = $idx;
+                break;
+            }
+        }
+
+        if ($accountIndex !== null && isset($meta['preBalances'][$accountIndex], $meta['postBalances'][$accountIndex])) {
+            $preLamports = (int) $meta['preBalances'][$accountIndex];
+            $postLamports = (int) $meta['postBalances'][$accountIndex];
+            $deltaLamports = $postLamports - $preLamports;
+
+            if ($deltaLamports > 0) {
+                $deltaSol = round($deltaLamports / 1e9, 9);
+                if ($deltaSol > 0.00001) {
+                    return ['token' => 'SOL', 'amount' => $deltaSol];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Retrieve active pending transfers currently held in escrow.
      */
     public function getPendingTransfers(int $userId, bool $isAdmin = false): array

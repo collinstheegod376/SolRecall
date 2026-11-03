@@ -216,6 +216,13 @@ class TransferController
                 return Response::error('Authentication required. Please log in.', 401);
             }
 
+            // Automatically sync on-chain incoming deposits for this user
+            try {
+                $this->transferService->syncUserDeposits($userId);
+            } catch (Throwable) {
+                // Non-fatal if network/RPC is throttled
+            }
+
             $balances = $this->transferService->getUserBalances($userId);
             $thresholds = $this->transferService->getThresholds();
 
@@ -226,6 +233,31 @@ class TransferController
             ], 'User balances retrieved.');
         } catch (Throwable $e) {
             return Response::error('Failed to fetch balances: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * POST /api/transfers/sync
+     *
+     * Explicitly syncs confirmed on-chain deposits and returns updated balances.
+     */
+    public function sync(Request $request): Response
+    {
+        try {
+            $userId = $this->getAuthenticatedUserId($request);
+            if ($userId === null) {
+                return Response::error('Authentication required. Please log in.', 401);
+            }
+
+            $credited = $this->transferService->syncUserDeposits($userId);
+            $balances = $this->transferService->getUserBalances($userId);
+
+            return Response::success([
+                'credited' => $credited,
+                'balances' => $balances,
+            ], "Synced with Solana Devnet. {$credited} new deposit(s) credited.");
+        } catch (Throwable $e) {
+            return Response::error('Failed to sync deposits: ' . $e->getMessage(), 500);
         }
     }
 

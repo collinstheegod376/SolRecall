@@ -316,6 +316,7 @@ if (str_starts_with($path, '/api/')) {
                 $req = Request::createFromGlobals();
                 $actionMethod = match ($sub) {
                     'balances' => 'balances',
+                    'sync' => 'sync',
                     'pending' => 'pending',
                     'history' => 'history',
                     'initiate' => 'initiate',

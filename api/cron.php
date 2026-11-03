@@ -128,11 +128,24 @@ try {
         $processed++;
     }
 
+    // 4. Automatically sync incoming on-chain deposits for users
+    $transferService = new \App\Services\TransferService($db, $rpcService, $keyService);
+    $users = $db->fetchAll("SELECT id FROM users WHERE solana_deposit_address IS NOT NULL AND solana_deposit_address != ''");
+    $totalDepositsCredited = 0;
+    foreach ($users as $u) {
+        try {
+            $totalDepositsCredited += $transferService->syncUserDeposits((int) $u['id']);
+        } catch (\Throwable) {
+            // Continue scanning other users
+        }
+    }
+
     echo json_encode([
         'success' => true,
         'processed' => $processed,
         'succeeded' => $succeeded,
         'failed' => $failed,
+        'deposits_credited' => $totalDepositsCredited,
         'timestamp' => $now,
         'duration_ms' => round((microtime(true) - $startTime) * 1000, 2)
     ]);
