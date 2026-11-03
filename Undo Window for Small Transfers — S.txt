@@ -1,0 +1,604 @@
+Undo Window for Small Transfers — Solana (SOL / USDC / USDT)
+
+Feature: Temporary escrow hold (5–15 minutes) for small outgoing transfers so users can cancel if they sent to the wrong address or changed their mind. After the window expires the transfer is broadcast on-chain.
+
+Stack: PHP backend + MySQL + Dark-mode Tailwind dashboard. Solana RPC for actual sends. Custodial key management for the undo feature.
+
+
+
+1. Core Concept & Flow
+
+
+
+
+
+User initiates a transfer (amount, token, destination Solana address).
+
+
+
+If amount ≤ per-token “small transfer” threshold:
+
+
+
+
+
+Deduct from available balance → move to escrow balance.
+
+
+
+Create a pending_transfers record with expires_at = now() + UNDO_WINDOW_MINUTES.
+
+
+
+Show live countdown on dashboard; user can cancel.
+
+
+
+On cancel: move funds back from escrow → available, mark cancelled.
+
+
+
+Cron job (every minute) finds expired pending transfers, broadcasts real on-chain transaction from platform hot wallet, updates status + stores signature.
+
+
+
+Large transfers skip the hold and broadcast immediately.
+
+Solves irreversible-mistake fear for everyday amounts while keeping full control of the delay.
+
+
+
+2. Frontend (Dark-mode Dashboard)
+
+Single-page public/dashboard.php (Tailwind CDN, vanilla JS).
+
+Sections
+
+
+
+
+
+Header — Logo, available balances per token (SOL / USDC / USDT) with icons, escrow summary.
+
+
+
+Pending Transfers — Cards with:
+
+
+
+
+
+Token icon + amount
+
+
+
+Truncated Solana address + copy button (toast feedback)
+
+
+
+Live countdown timer + draining progress bar
+
+
+
+Prominent “Cancel Transfer” button (confirmation modal)
+
+
+
+New Transfer form — Token selector, amount, destination address, optional note. Submits to initiate endpoint.
+
+
+
+History — Table of past transfers with status badges (completed / cancelled / failed).
+
+
+
+Settings — Undo window length (minutes), per-token small-transfer thresholds.
+
+
+
+Admin view — All pending transfers across users (admin only).
+
+
+
+Mobile bottom nav — Home / History / Settings / Admin.
+
+
+
+Toasts for success/error feedback.
+
+
+
+Empty states, responsive layout.
+
+Mock data currently drives the UI; later replaced by real API/DB calls.
+
+
+
+3. Database Schema (evolved)
+
+-- Users
+CREATE TABLE users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) UNIQUE,
+    email VARCHAR(255) UNIQUE,
+    password_hash VARCHAR(255) NULL,          -- for username/password
+    google_id VARCHAR(255) UNIQUE NULL,       -- for Google OAuth
+    wallet_address VARCHAR(44) NULL,          -- connected external wallet (optional)
+    solana_deposit_address VARCHAR(44),       -- platform-generated deposit address
+    encrypted_private_key TEXT,               -- encrypted keypair for custodial wallet
+    two_factor_secret VARCHAR(255) NULL,      -- TOTP secret
+    two_factor_enabled TINYINT DEFAULT 0,
+    is_admin TINYINT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Multi-token balances
+CREATE TABLE user_balances (
+    user_id INT NOT NULL,
+    token VARCHAR(10) NOT NULL,               -- SOL, USDC, USDT
+    available DECIMAL(20, 8) NOT NULL DEFAULT 0,
+    escrow DECIMAL(20, 8) NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, token),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+-- Pending undo transfers
+CREATE TABLE pending_transfers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    token VARCHAR(10) NOT NULL,
+    amount DECIMAL(20, 8) NOT NULL,
+    destination VARCHAR(44) NOT NULL,
+    note TEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL,
+    status ENUM('pending', 'cancelled', 'processing', 'completed', 'failed') DEFAULT 'pending',
+    tx_signature VARCHAR(88) NULL,
+    cancelled_at TIMESTAMP NULL,
+    processed_at TIMESTAMP NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE INDEX idx_pending_expires ON pending_transfers(status, expires_at);
+
+-- Deposits (for tracking incoming funds)
+CREATE TABLE deposits (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    token VARCHAR(10) NOT NULL,
+    amount DECIMAL(20, 8) NOT NULL,
+    tx_signature VARCHAR(88),
+    status ENUM('pending', 'confirmed', 'failed') DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Sessions / auth tokens (optional if using pure PHP sessions)
+CREATE TABLE sessions (
+    id VARCHAR(128) PRIMARY KEY,
+    user_id INT NOT NULL,
+    expires_at TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+
+
+4. Authentication
+
+Three methods supported:
+
+A. Username / Password
+
+
+
+
+
+Standard email or username + password.
+
+
+
+Store password_hash (bcrypt/argon2).
+
+
+
+Login creates PHP session ($_SESSION['user_id']).
+
+B. Google OAuth
+
+
+
+
+
+“Continue with Google” button.
+
+
+
+On success, match or create user by google_id / email.
+
+
+
+Same session system.
+
+C. Connect Wallet (Phantom, Solflare, Jupiter, etc.)
+
+
+
+
+
+Use Solana Wallet Adapter pattern (frontend JS).
+
+
+
+Supported wallets: Phantom, Solflare, Backpack, Jupiter (via their wallet or adapter), etc.
+
+
+
+Flow:
+
+
+
+
+
+User clicks “Connect Wallet”.
+
+
+
+Wallet prompts to connect and sign a nonce/message (Sign-In With Solana style).
+
+
+
+Backend verifies signature → creates or links user by wallet_address.
+
+
+
+Session established.
+
+
+
+Note: Connecting an external wallet is mainly for convenience / proof of ownership. The undo feature still requires platform custody of the funds being held.
+
+On every new user signup (any method):
+
+
+
+
+
+Generate a fresh Solana keypair (ed25519).
+
+
+
+Derive the public address → store as solana_deposit_address.
+
+
+
+Encrypt the private key (e.g. with a server-side master key or user-derived key) and store encrypted_private_key.
+
+
+
+This keypair is the user’s custodial wallet on the platform. All deposits go here; the platform can sign transfers from it when the undo window expires or for withdrawals.
+
+Export private key:
+
+
+
+
+
+Settings page: “Export Private Key” (after re-auth + optional 2FA).
+
+
+
+Decrypt and show once (with strong warnings: “Anyone with this key controls your funds”).
+
+
+
+Recommend users move funds to a non-custodial wallet if they want full self-custody.
+
+
+
+5. Funding & Ledger Logic
+
+
+
+
+
+Deposit: User sends SOL / USDC / USDT to their unique solana_deposit_address (or associated token account).
+
+
+
+Backend watcher (RPC polling or webhook) detects incoming transfer → credits user_balances.available.
+
+
+
+Initiate small transfer:
+
+
+
+
+
+Check available ≥ amount.
+
+
+
+Atomic DB transaction: decrease available, increase escrow, insert pending_transfer.
+
+
+
+Cancel: Reverse the balance move, mark cancelled.
+
+
+
+Cron process expired:
+
+
+
+
+
+Mark processing.
+
+
+
+Sign and broadcast real Solana transaction from the user’s custodial keypair (or from a shared hot wallet that has been funded from user deposits).
+
+
+
+On success: decrease escrow, store signature, status = completed.
+
+
+
+On failure: return to available, status = failed.
+
+
+
+Withdrawal (user wants funds out):
+
+
+
+
+
+Requires 2FA (see below).
+
+
+
+Deduct from available, broadcast on-chain transfer to external address.
+
+Platform hot wallet / per-user keypairs hold the real tokens. Database is the source of truth for ownership.
+
+
+
+6. 2FA for Withdrawals
+
+
+
+
+
+TOTP (Google Authenticator, Authy, etc.).
+
+
+
+User enables 2FA in Settings → scan QR / enter secret.
+
+
+
+Store encrypted two_factor_secret.
+
+
+
+On any withdrawal request:
+
+
+
+
+
+User enters amount + destination.
+
+
+
+Prompt for current TOTP code.
+
+
+
+Verify before broadcasting.
+
+
+
+Optional: also require 2FA for private-key export and for disabling 2FA.
+
+
+
+7. Additional Angles / Risks You May Not Have Considered
+
+
+
+
+
+
+
+Area
+
+
+
+Consideration
+
+
+
+
+
+Custodial risk
+
+
+
+Platform holds private keys → you are responsible for security, insurance, audits, and regulatory compliance (possible money-transmitter licensing).
+
+
+
+
+
+Key encryption
+
+
+
+Never store raw private keys. Use strong encryption (AES-256-GCM) with a master key stored in a secrets manager / HSM.
+
+
+
+
+
+Hot wallet security
+
+
+
+Limit hot-wallet balance. Cold storage for excess. Multi-sig or MPC later.
+
+
+
+
+
+Deposit detection
+
+
+
+Reliable RPC watcher + confirmation threshold (e.g. 1–32 slots). Handle re-orgs.
+
+
+
+
+
+Token accounts
+
+
+
+USDC/USDT need associated token accounts (ATAs). Auto-create them.
+
+
+
+
+
+Fees
+
+
+
+Platform pays network fees for outgoing transfers. Decide who covers them.
+
+
+
+
+
+Rate limiting & abuse
+
+
+
+Limit initiate/cancel frequency. Monitor for wash trading or dust attacks.
+
+
+
+
+
+Race conditions
+
+
+
+Use DB transactions + row locks when moving balances or processing cron.
+
+
+
+
+
+User education
+
+
+
+Clear warnings: “This is custodial during the undo window.” “Exporting key = full control.”
+
+
+
+
+
+Compliance
+
+
+
+KYC thresholds, transaction monitoring, travel rule if volumes grow.
+
+
+
+
+
+Recovery
+
+
+
+What happens if user loses access? Support process for account recovery.
+
+
+
+
+
+Jupiter note
+
+
+
+Jupiter is primarily a swap aggregator. “Connect with Jupiter” usually means using a wallet that supports Jupiter or their own wallet interface; treat it like any other wallet adapter.
+
+
+
+
+
+Non-custodial alternative
+
+
+
+Fully non-custodial undo is hard; would require a Solana program that holds tokens in a PDA and releases after a delay (more complex, on-chain rent, etc.). Current design is custodial by necessity for the simple delay.
+
+
+
+8. File Structure (current + planned)
+
+undo-window-php/
+├── schema.sql
+├── includes/config.php
+├── public/dashboard.php          ← full dark UI
+├── public/login.php              ← (to build)
+├── public/register.php           ← (to build)
+├── public/initiate.php           ← (to build)
+├── public/cancel.php             ← (to build)
+├── cron/process_pending.php      ← (to build)
+└── SPEC.md                       ← this file
+
+
+
+9. Next Implementation Steps
+
+
+
+
+
+Update schema with auth, multi-token balances, key storage.
+
+
+
+Build login / register / Google OAuth / wallet-connect flows.
+
+
+
+On signup: generate + encrypt Solana keypair.
+
+
+
+Build initiate / cancel endpoints that correctly move balances.
+
+
+
+Implement cron broadcaster (Solana RPC).
+
+
+
+Add 2FA setup + verification for withdrawals and key export.
+
+
+
+Deposit watcher.
+
+
+
+Wire dashboard to real data.
+
+This document is the single source of truth for everything agreed so far.

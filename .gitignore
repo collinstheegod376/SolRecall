@@ -1,0 +1,29 @@
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+
+# SQLite Database Files
+*.sqlite
+*.sqlite3
+*.db
+database/*.sqlite
+
+# Logs & Storage
+storage/logs/*.log
+*.log
+
+# Vendor & Dependencies
+vendor/
+node_modules/
+
+# OS & Editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Vercel
+.vercel/

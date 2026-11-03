@@ -1,0 +1,7 @@
+.git
+.env
+database/*.sqlite
+database/test_undo.sqlite
+tests/
+storage/logs/*.log
+*.txt
