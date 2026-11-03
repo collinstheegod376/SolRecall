@@ -426,6 +426,40 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
                          class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs focus:outline-none focus:border-purple-500 transition">
                 </div>
 
+                <!-- Escrow Hold / Timelock Duration Selection (Minutes to Years) -->
+                <div>
+                  <div class="flex items-center justify-between mb-1.5">
+                    <label for="transferWindowPreset" class="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                      Escrow Hold / Timelock Duration
+                    </label>
+                    <span class="text-[11px] text-purple-400 font-medium">Minutes to Years</span>
+                  </div>
+                  <select id="transferWindowPreset" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-white text-xs focus:outline-none focus:border-purple-500 transition">
+                    <option value="5">5 Minutes</option>
+                    <option value="10" selected>10 Minutes (Default)</option>
+                    <option value="60">1 Hour</option>
+                    <option value="1440">24 Hours (1 Day)</option>
+                    <option value="10080">7 Days (1 Week)</option>
+                    <option value="43200">30 Days (1 Month)</option>
+                    <option value="525600">1 Year (365 Days)</option>
+                    <option value="1051200">2 Years</option>
+                    <option value="2628000">5 Years</option>
+                    <option value="custom">Custom Duration (Years, Months, Days)...</option>
+                  </select>
+
+                  <div id="customDurationBox" class="hidden grid grid-cols-2 gap-2 mt-2">
+                    <input type="number" id="customDurationValue" min="1" value="1" placeholder="Amount" class="px-3.5 py-2 rounded-xl bg-slate-950 border border-white/10 text-white font-mono text-xs focus:outline-none focus:border-purple-500">
+                    <select id="customDurationUnit" class="px-3 py-2 rounded-xl bg-slate-950 border border-white/10 text-white text-xs focus:outline-none focus:border-purple-500">
+                      <option value="minutes">Minutes</option>
+                      <option value="hours">Hours</option>
+                      <option value="days">Days</option>
+                      <option value="weeks">Weeks</option>
+                      <option value="months">Months</option>
+                      <option value="years" selected>Years</option>
+                    </select>
+                  </div>
+                </div>
+
                 <!-- Dynamic Threshold & Undo Notice Card -->
                 <div id="transferNoticeBox" class="rounded-xl p-3 bg-slate-800/60 border border-white/5 text-slate-400 text-xs flex items-start gap-2.5">
                   <div id="transferNoticeText">
@@ -541,12 +575,18 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
 
             <div>
               <label for="settingsUndoWindow" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                Escrow Hold Length
+                Default Escrow Hold Length
               </label>
               <select id="settingsUndoWindow" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-white text-sm focus:outline-none focus:border-purple-500 transition">
                 <option value="5">5 Minutes (Quick check)</option>
-                <option value="10" selected>10 Minutes (Recommended standard)</option>
-                <option value="15">15 Minutes (Maximum protection)</option>
+                <option value="10" selected>10 Minutes (Standard)</option>
+                <option value="60">1 Hour</option>
+                <option value="1440">24 Hours (1 Day)</option>
+                <option value="10080">7 Days (1 Week)</option>
+                <option value="43200">30 Days (1 Month)</option>
+                <option value="525600">1 Year (365 Days)</option>
+                <option value="1051200">2 Years</option>
+                <option value="2628000">5 Years</option>
               </select>
             </div>
 

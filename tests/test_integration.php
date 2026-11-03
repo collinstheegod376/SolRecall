@@ -189,7 +189,42 @@ echo "After Large Send - SOL Available: {$balancesAfterLarge['SOL']['available']
 assert(abs($balancesAfterLarge['SOL']['available'] - 2.0) < 0.0001);
 assert(abs($balancesAfterLarge['SOL']['escrow'] - 0.0) < 0.0001);
 
-// 7. Test Cron Expired Transfer Processing
+// 7. Test Multi-Year Timelock Duration & Human Formatting
+echo "\n--- Testing Multi-Year Escrow Timelock & Duration Formatting ---\n";
+assert(TransferService::formatHumanDuration(5) === '5 minutes');
+assert(TransferService::formatHumanDuration(60) === '1 hour');
+assert(TransferService::formatHumanDuration(1440) === '1 day');
+assert(TransferService::formatHumanDuration(10080) === '1 week');
+assert(TransferService::formatHumanDuration(43200) === '1 month');
+assert(TransferService::formatHumanDuration(525600) === '1 year');
+assert(TransferService::formatHumanDuration(1051200) === '2 years');
+assert(TransferService::formatHumanDuration(2628000) === '5 years');
+echo "[OK] formatHumanDuration validated across minutes, hours, days, weeks, months, and years.\n";
+
+// Initiate a 1-year escrow hold transfer (525,600 minutes)
+$multiYearTransfer = $transferService->initiateTransfer(
+    1,
+    'SOL',
+    0.2,
+    $destinationPubkey,
+    'Multi-year trust fund hold',
+    525600 // 1 year
+);
+assert($multiYearTransfer['type'] === 'escrow');
+assert($multiYearTransfer['status'] === 'pending');
+assert($multiYearTransfer['window_minutes'] === 525600);
+assert($multiYearTransfer['window_human'] === '1 year');
+$oneYearFromNow = time() + (525600 * 60);
+$actualExpiry = strtotime($multiYearTransfer['expires_at']);
+assert(abs($actualExpiry - $oneYearFromNow) < 5, 'Expiry timestamp must be ~1 year in the future');
+echo "[OK] Multi-year escrow transfer #{$multiYearTransfer['transfer_id']} successfully created with 1-year hold (Expires: {$multiYearTransfer['expires_at']})!\n";
+
+// Cancel the multi-year transfer and restore funds
+$cancelMultiYear = $transferService->cancelTransfer(1, $multiYearTransfer['transfer_id']);
+assert($cancelMultiYear['status'] === 'cancelled');
+echo "[OK] Multi-year escrow transfer cancelled and funds restored.\n";
+
+// 8. Test Cron Expired Transfer Processing
 echo "\n--- Testing Cron Broadcaster (process_pending.php logic) ---\n";
 // Create another small transfer and set its expires_at to 1 minute ago (expired)
 $holdResult = $transferService->initiateTransfer(1, 'SOL', 1.0, $destinationPubkey, 'Will be expired for cron test');
@@ -275,6 +310,24 @@ $bodyInitiate = json_decode($resInitiate->getBody(), true);
 assert($bodyInitiate['success'] === true);
 $controllerTransferId = $bodyInitiate['data']['transfer_id'];
 echo "[OK] POST /api/transfers/initiate created transfer #{$controllerTransferId} (Hold window: {$bodyInitiate['data']['window_minutes']}m)\n";
+
+// C2. /api/transfers/initiate with duration_value and duration_unit (2 Years)
+$postDataYears = [
+    'token' => 'USDT',
+    'amount' => 10.0,
+    'destination' => $destinationPubkey,
+    'note' => '2-year timelock via unit parameters',
+    'duration_value' => 2,
+    'duration_unit' => 'years',
+];
+$reqPostYears = new Request([], [], ['REQUEST_METHOD' => 'POST', 'CONTENT_TYPE' => 'application/json'], [], json_encode($postDataYears));
+$resInitiateYears = $controller->initiate($reqPostYears);
+assert($resInitiateYears->getStatusCode() === 200);
+$bodyYears = json_decode($resInitiateYears->getBody(), true);
+assert($bodyYears['success'] === true);
+assert($bodyYears['data']['window_minutes'] === 1051200);
+assert($bodyYears['data']['window_human'] === '2 years');
+echo "[OK] POST /api/transfers/initiate with {duration_value: 2, duration_unit: 'years'} created transfer #{$bodyYears['data']['transfer_id']} with 2-year hold!\n";
 
 // D. /api/transfers/pending (GET)
 $resPending = $controller->pending($req);

@@ -76,7 +76,23 @@ class TransferController
             $amount = (float) $request->input('amount', 0.0);
             $destination = (string) $request->input('destination', '');
             $note = $request->input('note') !== null ? (string) $request->input('note') : null;
-            $customMinutes = $request->input('window_minutes') !== null ? (int) $request->input('window_minutes') : null;
+            
+            // Support both direct minutes or flexible value + unit (hours, days, months, years)
+            $customMinutes = null;
+            if ($request->input('duration_value') !== null && $request->input('duration_unit') !== null) {
+                $val = (float) $request->input('duration_value');
+                $unit = strtolower(trim((string) $request->input('duration_unit')));
+                $customMinutes = (int) match ($unit) {
+                    'year', 'years', 'y' => round($val * 525600),
+                    'month', 'months', 'mo' => round($val * 43200),
+                    'week', 'weeks', 'w' => round($val * 10080),
+                    'day', 'days', 'd' => round($val * 1440),
+                    'hour', 'hours', 'h' => round($val * 60),
+                    default => round($val)
+                };
+            } elseif ($request->input('window_minutes') !== null) {
+                $customMinutes = (int) $request->input('window_minutes');
+            }
 
             if ($token === '' || $destination === '') {
                 return Response::error('Missing required fields: token and destination are required.', 422);

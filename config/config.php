@@ -71,8 +71,8 @@ return [
 
     'undo_window' => [
         'default_minutes' => (int) $env('DEFAULT_UNDO_WINDOW_MINUTES', 10),
-        'min_minutes' => (int) $env('MIN_UNDO_WINDOW_MINUTES', 5),
-        'max_minutes' => (int) $env('MAX_UNDO_WINDOW_MINUTES', 60),
+        'min_minutes' => (int) $env('MIN_UNDO_WINDOW_MINUTES', 1),
+        'max_minutes' => (int) $env('MAX_UNDO_WINDOW_MINUTES', 52560000), // Supports up to 100 years
     ],
 
     'auth' => [

@@ -111,10 +111,10 @@ class TransferService
 
         $isSmall = $this->isSmallTransfer($token, $amount);
 
-        // Calculate undo window duration
+        // Calculate undo window duration (supports minutes up to 100 years)
         $defaultWindow = (int) config('undo_window.default_minutes', 10);
-        $minWindow = (int) config('undo_window.min_minutes', 5);
-        $maxWindow = (int) config('undo_window.max_minutes', 60);
+        $minWindow = (int) config('undo_window.min_minutes', 1);
+        $maxWindow = (int) config('undo_window.max_minutes', 52560000);
 
         $windowMinutes = $customWindowMinutes !== null ? $customWindowMinutes : $defaultWindow;
         $windowMinutes = max($minWindow, min($maxWindow, $windowMinutes));
@@ -163,6 +163,7 @@ class TransferService
                 );
 
                 $transferId = (int) $db->lastInsertId();
+                $humanDuration = self::formatHumanDuration($windowMinutes);
 
                 return [
                     'success' => true,
@@ -174,9 +175,10 @@ class TransferService
                     'destination' => $destination,
                     'note' => $note,
                     'window_minutes' => $windowMinutes,
+                    'window_human' => $humanDuration,
                     'expires_at' => $expiresAt,
                     'seconds_remaining' => $windowMinutes * 60,
-                    'message' => "Transfer of {$amount} {$token} initiated with a {$windowMinutes}-minute undo hold window.",
+                    'message' => "Transfer of {$amount} {$token} initiated with a {$humanDuration} escrow hold window.",
                 ];
             });
         }
@@ -529,6 +531,8 @@ class TransferService
 
             $row['amount'] = (float) $row['amount'];
             $row['seconds_remaining'] = $remaining;
+            $row['total_seconds'] = $totalWindow;
+            $row['window_human'] = self::formatHumanDuration((int) max(1, round($totalWindow / 60)));
             $row['is_cancellable'] = ($remaining > 0);
             $row['progress_percent'] = $progressPercent;
             return $row;
@@ -551,6 +555,39 @@ class TransferService
             $row['amount'] = (float) $row['amount'];
             return $row;
         }, $rows);
+    }
+
+    /**
+     * Format minutes into a clean human readable duration (e.g. "2 years", "3 months", "7 days", "10 minutes").
+     */
+    public static function formatHumanDuration(int $minutes): string
+    {
+        if ($minutes >= 525600) {
+            $years = round($minutes / 525600, 1);
+            $clean = ($years == (int) $years) ? (int) $years : $years;
+            return "{$clean} year" . ($clean !== 1 ? 's' : '');
+        }
+        if ($minutes >= 43200) {
+            $months = round($minutes / 43200, 1);
+            $clean = ($months == (int) $months) ? (int) $months : $months;
+            return "{$clean} month" . ($clean !== 1 ? 's' : '');
+        }
+        if ($minutes >= 10080) {
+            $weeks = round($minutes / 10080, 1);
+            $clean = ($weeks == (int) $weeks) ? (int) $weeks : $weeks;
+            return "{$clean} week" . ($clean !== 1 ? 's' : '');
+        }
+        if ($minutes >= 1440) {
+            $days = round($minutes / 1440, 1);
+            $clean = ($days == (int) $days) ? (int) $days : $days;
+            return "{$clean} day" . ($clean !== 1 ? 's' : '');
+        }
+        if ($minutes >= 60) {
+            $hours = round($minutes / 60, 1);
+            $clean = ($hours == (int) $hours) ? (int) $hours : $hours;
+            return "{$clean} hour" . ($clean !== 1 ? 's' : '');
+        }
+        return "{$minutes} minute" . ($minutes !== 1 ? 's' : '');
     }
 
     /**

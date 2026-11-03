@@ -116,12 +116,74 @@
     return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: maxDecimals });
   }
 
-  // Format Countdown Seconds to MM:SS
-  function formatMMSS(seconds) {
+  // Smart multi-unit countdown formatter (seconds to Years, Days, Hours, Minutes, Seconds)
+  function formatDuration(seconds) {
     if (seconds <= 0) return '00:00';
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
+
+    const sec = Math.floor(seconds);
+    const minute = 60;
+    const hour = 3600;
+    const day = 86400;
+    const year = 31536000; // 365 days
+
+    if (sec >= year) {
+      const years = Math.floor(sec / year);
+      const remainingDays = Math.floor((sec % year) / day);
+      return remainingDays > 0 ? `${years}y ${remainingDays}d` : `${years}y`;
+    }
+
+    if (sec >= day) {
+      const days = Math.floor(sec / day);
+      const remainingHours = Math.floor((sec % day) / hour);
+      return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
+    }
+
+    if (sec >= hour) {
+      const hours = Math.floor(sec / hour);
+      const remainingMins = Math.floor((sec % hour) / minute);
+      const remainingSecs = sec % minute;
+      return `${hours}h ${remainingMins.toString().padStart(2, '0')}m ${remainingSecs.toString().padStart(2, '0')}s`;
+    }
+
+    const mins = Math.floor(sec / minute);
+    const secs = sec % minute;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  // Format minutes into clean human readable duration
+  function formatHumanDuration(minutes) {
+    const mins = parseInt(minutes, 10) || 0;
+    if (mins >= 525600) {
+      const y = Math.round((mins / 525600) * 10) / 10;
+      const cleanY = (y === Math.floor(y)) ? Math.floor(y) : y;
+      return `${cleanY} year${cleanY !== 1 ? 's' : ''}`;
+    }
+    if (mins >= 43200) {
+      const m = Math.round((mins / 43200) * 10) / 10;
+      const cleanM = (m === Math.floor(m)) ? Math.floor(m) : m;
+      return `${cleanM} month${cleanM !== 1 ? 's' : ''}`;
+    }
+    if (mins >= 10080) {
+      const w = Math.round((mins / 10080) * 10) / 10;
+      const cleanW = (w === Math.floor(w)) ? Math.floor(w) : w;
+      return `${cleanW} week${cleanW !== 1 ? 's' : ''}`;
+    }
+    if (mins >= 1440) {
+      const d = Math.round((mins / 1440) * 10) / 10;
+      const cleanD = (d === Math.floor(d)) ? Math.floor(d) : d;
+      return `${cleanD} day${cleanD !== 1 ? 's' : ''}`;
+    }
+    if (mins >= 60) {
+      const h = Math.round((mins / 60) * 10) / 10;
+      const cleanH = (h === Math.floor(h)) ? Math.floor(h) : h;
+      return `${cleanH} hour${cleanH !== 1 ? 's' : ''}`;
+    }
+    return `${mins} minute${mins !== 1 ? 's' : ''}`;
+  }
+
+  // Alias for backward compatibility
+  function formatMMSS(seconds) {
+    return formatDuration(seconds);
   }
 
   // API Call Helper
@@ -670,28 +732,51 @@
     const tokenSelect = document.getElementById('transferToken');
     const amountInput = document.getElementById('transferAmount');
     const destInput = document.getElementById('transferDestination');
+    const presetSelect = document.getElementById('transferWindowPreset');
+    const customBox = document.getElementById('customDurationBox');
+    const customVal = document.getElementById('customDurationValue');
+    const customUnit = document.getElementById('customDurationUnit');
     const noticeBox = document.getElementById('transferNoticeBox');
     const noticeText = document.getElementById('transferNoticeText');
     const maxBtn = document.getElementById('maxAmountBtn');
     const percentBtns = document.querySelectorAll('.percent-btn');
 
+    function getSelectedWindowMinutes() {
+      if (!presetSelect) return AppState.settings.undoWindowMinutes || 10;
+      if (presetSelect.value === 'custom') {
+        const val = Math.max(1, parseInt(customVal ? customVal.value : 1, 10) || 1);
+        const unit = customUnit ? customUnit.value : 'minutes';
+        const mults = {
+          minutes: 1,
+          hours: 60,
+          days: 1440,
+          weeks: 10080,
+          months: 43200,
+          years: 525600
+        };
+        return val * (mults[unit] || 1);
+      }
+      return parseInt(presetSelect.value, 10) || (AppState.settings.undoWindowMinutes || 10);
+    }
+
     function updateNotice() {
       const token = tokenSelect ? tokenSelect.value : 'SOL';
       const amount = parseFloat(amountInput ? amountInput.value : 0) || 0;
       const threshold = AppState.thresholds[token] || 2.0;
-      const windowMins = AppState.settings.undoWindowMinutes || 10;
+      const windowMins = getSelectedWindowMinutes();
+      const humanWin = formatHumanDuration(windowMins);
 
       if (noticeBox && noticeText) {
         noticeBox.classList.remove('hidden');
         if (amount > 0 && amount <= threshold) {
           noticeBox.className = 'rounded-xl p-3 bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-2.5';
-          noticeText.innerHTML = `<strong>🛡️ Protected by ${windowMins}-Min Undo Window:</strong> Transfer is held in escrow. You can review or cancel anytime before the timer runs out.`;
+          noticeText.innerHTML = `<strong>🛡️ Protected by ${humanWin} Escrow Hold:</strong> Transfer is held in escrow. You can review or cancel anytime before the timer runs out.`;
         } else if (amount > threshold) {
           noticeBox.className = 'rounded-xl p-3 bg-purple-500/10 border border-purple-500/30 text-purple-200 text-xs flex items-start gap-2.5';
           noticeText.innerHTML = `<strong>⚡ Instant Broadcast:</strong> Transfer amount (${amount} ${token}) exceeds the small transfer threshold of ${threshold} ${token}. Will be broadcast immediately on Solana.`;
         } else {
           noticeBox.className = 'rounded-xl p-3 bg-slate-800/60 border border-white/5 text-slate-400 text-xs flex items-start gap-2.5';
-          noticeText.innerHTML = `<strong>ℹ️ Small Transfer Protection:</strong> Transfers up to ${threshold} ${token} are held in a ${windowMins}-minute undo window before broadcasting.`;
+          noticeText.innerHTML = `<strong>ℹ️ Small Transfer Protection:</strong> Transfers up to ${threshold} ${token} are held in a ${humanWin} escrow window before broadcasting.`;
         }
       }
 
@@ -718,6 +803,18 @@
 
     if (tokenSelect) tokenSelect.addEventListener('change', updateNotice);
     if (amountInput) amountInput.addEventListener('input', updateNotice);
+    if (presetSelect) {
+      presetSelect.addEventListener('change', () => {
+        if (presetSelect.value === 'custom') {
+          if (customBox) customBox.classList.remove('hidden');
+        } else {
+          if (customBox) customBox.classList.add('hidden');
+        }
+        updateNotice();
+      });
+    }
+    if (customVal) customVal.addEventListener('input', updateNotice);
+    if (customUnit) customUnit.addEventListener('change', updateNotice);
 
     // MAX button
     if (maxBtn) {
@@ -783,10 +880,12 @@
       if (submitBtnSpinner) submitBtnSpinner.classList.remove('hidden');
       if (submitBtnText) submitBtnText.textContent = 'Processing Transfer...';
 
+      const windowMinutes = getSelectedWindowMinutes();
+
       try {
         const res = await apiFetch('/api/transfers/initiate', {
           method: 'POST',
-          body: JSON.stringify({ token, amount, destination, note })
+          body: JSON.stringify({ token, amount, destination, note, window_minutes: windowMinutes })
         });
 
         if (res.success) {
