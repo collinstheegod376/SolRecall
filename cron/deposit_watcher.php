@@ -326,14 +326,25 @@ function processExpiredTransfers(Database $db, SolanaRpcService $rpcService, Key
 if ($poll) {
     echo "Running in continuous polling daemon mode (interval: {$interval}s). Press Ctrl+C to terminate.\n";
     while (true) {
-        $credited = scanDeposits($db, $rpcService, $filterUser, $simulate, $verbose);
-        if ($credited > 0) {
-            echo "[" . date('Y-m-d H:i:s') . "] Processed {$credited} new deposit(s).\n";
-        }
+        try {
+            $credited = scanDeposits($db, $rpcService, $filterUser, $simulate, $verbose);
+            if ($credited > 0) {
+                echo "[" . date('Y-m-d H:i:s') . "] Processed {$credited} new deposit(s).\n";
+            }
 
-        $broadcasted = processExpiredTransfers($db, $rpcService, $keyService);
-        if ($broadcasted > 0) {
-            echo "[" . date('Y-m-d H:i:s') . "] Broadcasted {$broadcasted} expired transfer(s) on-chain.\n";
+            $broadcasted = processExpiredTransfers($db, $rpcService, $keyService);
+            if ($broadcasted > 0) {
+                echo "[" . date('Y-m-d H:i:s') . "] Broadcasted {$broadcasted} expired transfer(s) on-chain.\n";
+            }
+        } catch (\Throwable $loopErr) {
+            echo "[" . date('Y-m-d H:i:s') . "] [LOOP NOTICE] " . $loopErr->getMessage() . "\n";
+            // Re-instantiate database connection in case of connection drop
+            try {
+                Database::resetInstance();
+                $db = Database::getInstance();
+            } catch (\Throwable) {
+                // Will retry on next tick
+            }
         }
 
         sleep($interval);

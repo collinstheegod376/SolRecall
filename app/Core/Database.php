@@ -94,7 +94,10 @@ class Database
         $options = $this->config['options'] ?? [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES => false,
+            // CRITICAL FOR SUPABASE POOLER (PORT 6543):
+            // Emulate prepares must be true so PgBouncer/Supavisor doesn't throw
+            // "prepared statement pdo_stmt_... does not exist" when pooler switches connections.
+            PDO::ATTR_EMULATE_PREPARES => true,
             PDO::ATTR_STRINGIFY_FETCHES => false,
         ];
 
