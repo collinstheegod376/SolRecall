@@ -415,7 +415,10 @@ class KeyManagementService
 
         return [
             'depositAddress' => (string) $user->solana_deposit_address,
+            'deposit_address' => (string) $user->solana_deposit_address,
             'privateKeyBase58' => $secretKeyBase58,
+            'private_key' => $secretKeyBase58,
+            'secret_key' => $secretKeyBase58,
             'privateKeyArray' => $secretKeyArray,
             'warning' => 'CRITICAL SECURITY NOTICE: Anyone who possesses this private key has irrevocable control over all funds in this address. Never disclose this key to platform support, third parties, or unverified software.',
             'exportedAt' => gmdate('c'),

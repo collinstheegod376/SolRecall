@@ -408,12 +408,25 @@ class AuthController extends Controller
                 'code' => 'required|string',
             ]);
 
+            // Optional password verification if provided and user has a password hash
+            $password = (string) ($request->input('password') ?? '');
+            if ($password !== '' && !empty($user->password_hash)) {
+                if (!$user->verifyPassword($password)) {
+                    return $this->jsonError('Incorrect account password. Verification failed.', 403);
+                }
+            }
+
             $result = $this->keyService->exportUserPrivateKey(
                 $user,
                 (string) $data['code'],
                 $request->ip(),
                 $request->userAgent()
             );
+
+            // Ensure aliases are present in the response
+            $result['private_key'] = $result['privateKeyBase58'];
+            $result['secret_key'] = $result['privateKeyBase58'];
+            $result['deposit_address'] = $result['depositAddress'];
 
             return $this->jsonSuccess($result, 'Custodial private key exported securely.');
         } catch (ValidationException $e) {

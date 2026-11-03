@@ -1397,14 +1397,60 @@
   window.verifyAndEnable2Fa = verifyAndEnable2Fa;
 
   // Export Custodial Private Key Flow
+  let currentExportedPrivateKey = '';
+  let isPrivateKeyRevealed = false;
+
   function openExportKeyModal() {
     const modal = document.getElementById('exportKeyModal');
     if (modal) {
+      // Always reset to initial state
+      currentExportedPrivateKey = '';
+      isPrivateKeyRevealed = false;
+
+      const pwdInput = document.getElementById('exportKeyPassword');
+      const totpInput = document.getElementById('exportKeyTotp');
+      if (pwdInput) pwdInput.value = '';
+      if (totpInput) totpInput.value = '';
+
+      const keyDisplay = document.getElementById('rawPrivateKeyDisplay');
+      if (keyDisplay) keyDisplay.textContent = 'Loading...';
+
+      const blurBox = document.getElementById('privateKeyBlurBox');
+      if (blurBox) {
+        blurBox.classList.remove('key-revealed', 'blur-0', 'select-all', 'pointer-events-auto');
+        blurBox.classList.add('key-blurred', 'blur-md', 'select-none', 'pointer-events-none');
+      }
+
+      const overlay = document.getElementById('privateKeyOverlay');
+      if (overlay) overlay.classList.remove('hidden');
+
+      const badge = document.getElementById('keyStatusBadge');
+      if (badge) {
+        badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse"></span><span>Encrypted in View</span>`;
+        badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-1';
+      }
+
+      const revealBtn = document.getElementById('revealCopyKeyBtn');
+      if (revealBtn) {
+        revealBtn.innerHTML = `
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+          <span>Reveal Private Key</span>
+        `;
+        revealBtn.className = 'w-full py-3 px-4 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 shadow-lg shadow-purple-600/25 flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer';
+      }
+
       const step1 = document.getElementById('exportKeyStep1');
       const step2 = document.getElementById('exportKeyStep2');
       if (step1) step1.classList.remove('hidden');
       if (step2) step2.classList.add('hidden');
       modal.classList.remove('hidden');
+
+      if (totpInput) {
+        setTimeout(() => {
+          if (pwdInput && !pwdInput.value) pwdInput.focus();
+          else totpInput.focus();
+        }, 100);
+      }
     }
   }
   window.openExportKeyModal = openExportKeyModal;
@@ -1412,14 +1458,61 @@
   function closeExportKeyModal() {
     const modal = document.getElementById('exportKeyModal');
     if (modal) modal.classList.add('hidden');
+
+    // Securely purge sensitive private key from memory and DOM
+    currentExportedPrivateKey = '';
+    isPrivateKeyRevealed = false;
+
+    const keyDisplay = document.getElementById('rawPrivateKeyDisplay');
+    if (keyDisplay) keyDisplay.textContent = '';
+
+    const blurBox = document.getElementById('privateKeyBlurBox');
+    if (blurBox) {
+      blurBox.classList.remove('key-revealed', 'blur-0', 'select-all', 'pointer-events-auto');
+      blurBox.classList.add('key-blurred', 'blur-md', 'select-none', 'pointer-events-none');
+    }
+
+    const overlay = document.getElementById('privateKeyOverlay');
+    if (overlay) overlay.classList.remove('hidden');
+
+    const badge = document.getElementById('keyStatusBadge');
+    if (badge) {
+      badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse"></span><span>Encrypted in View</span>`;
+      badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-1';
+    }
+
+    const revealBtn = document.getElementById('revealCopyKeyBtn');
+    if (revealBtn) {
+      revealBtn.innerHTML = `
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+        <span>Reveal Private Key</span>
+      `;
+      revealBtn.className = 'w-full py-3 px-4 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 shadow-lg shadow-purple-600/25 flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer';
+    }
+
+    const pwdInput = document.getElementById('exportKeyPassword');
+    const totpInput = document.getElementById('exportKeyTotp');
+    if (pwdInput) pwdInput.value = '';
+    if (totpInput) totpInput.value = '';
+
+    const step1 = document.getElementById('exportKeyStep1');
+    const step2 = document.getElementById('exportKeyStep2');
+    if (step1) step1.classList.remove('hidden');
+    if (step2) step2.classList.add('hidden');
   }
   window.closeExportKeyModal = closeExportKeyModal;
 
   async function verifyAndRevealKey() {
     const pwdInput = document.getElementById('exportKeyPassword');
     const totpInput = document.getElementById('exportKeyTotp');
-    const pwd = pwdInput ? pwdInput.value : '';
-    const totp = totpInput ? totpInput.value : '';
+    const pwd = pwdInput ? pwdInput.value.trim() : '';
+    const totp = totpInput ? totpInput.value.trim() : '';
+
+    if (!totp) {
+      showToast('Please enter your 6-digit 2FA authenticator code.', 'warning');
+      if (totpInput) totpInput.focus();
+      return;
+    }
 
     const btn = document.getElementById('submitExportKeyVerifyBtn');
     if (btn) {
@@ -1433,22 +1526,60 @@
         body: JSON.stringify({ password: pwd, code: totp })
       });
 
-      const key = (res.data && res.data.private_key) || res.private_key;
+      const payload = res.data || res;
+      const key = payload.privateKeyBase58 || payload.private_key || payload.secret_key || res.privateKeyBase58 || res.private_key;
+
       if (res.success && key) {
+        currentExportedPrivateKey = key;
+        isPrivateKeyRevealed = false;
+
         const step1 = document.getElementById('exportKeyStep1');
         const step2 = document.getElementById('exportKeyStep2');
         const keyDisplay = document.getElementById('rawPrivateKeyDisplay');
+        const addressDisplay = document.getElementById('exportKeyDepositAddress');
+
+        if (addressDisplay) {
+          addressDisplay.textContent = payload.depositAddress || payload.deposit_address || (AppState.user && AppState.user.solana_deposit_address) || 'Your Custodial Wallet';
+        }
+
+        if (keyDisplay) {
+          keyDisplay.textContent = key;
+        }
+
+        // Ensure key begins blurred
+        const blurBox = document.getElementById('privateKeyBlurBox');
+        if (blurBox) {
+          blurBox.classList.remove('key-revealed', 'blur-0', 'select-all', 'pointer-events-auto');
+          blurBox.classList.add('key-blurred', 'blur-md', 'select-none', 'pointer-events-none');
+        }
+
+        const overlay = document.getElementById('privateKeyOverlay');
+        if (overlay) overlay.classList.remove('hidden');
+
+        const badge = document.getElementById('keyStatusBadge');
+        if (badge) {
+          badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse"></span><span>Encrypted in View</span>`;
+          badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-1';
+        }
+
+        const revealBtn = document.getElementById('revealCopyKeyBtn');
+        if (revealBtn) {
+          revealBtn.innerHTML = `
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+            <span>Reveal Private Key</span>
+          `;
+          revealBtn.className = 'w-full py-3 px-4 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 shadow-lg shadow-purple-600/25 flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer';
+        }
 
         if (step1) step1.classList.add('hidden');
         if (step2) step2.classList.remove('hidden');
-        if (keyDisplay) keyDisplay.textContent = key;
 
-        showToast('Private key decrypted. Keep it strictly confidential!', 'warning', 5000);
+        showToast('Private key decrypted securely. Click Reveal to unblur.', 'success', 4000);
       } else {
         showToast(res.message || res.error || 'Verification failed. Incorrect credentials.', 'error');
       }
     } catch (err) {
-      showToast(err.message, 'error');
+      showToast(err.message || 'Verification failed.', 'error');
     } finally {
       if (btn) {
         btn.disabled = false;
@@ -1457,6 +1588,56 @@
     }
   }
   window.verifyAndRevealKey = verifyAndRevealKey;
+
+  function toggleRevealOrCopyKey() {
+    const blurBox = document.getElementById('privateKeyBlurBox');
+    const overlay = document.getElementById('privateKeyOverlay');
+    const badge = document.getElementById('keyStatusBadge');
+    const btn = document.getElementById('revealCopyKeyBtn');
+
+    if (!isPrivateKeyRevealed) {
+      // Step A: Reveal action (Unblur box and change button to Copy)
+      isPrivateKeyRevealed = true;
+      if (blurBox) {
+        blurBox.classList.remove('key-blurred', 'blur-md', 'select-none', 'pointer-events-none');
+        blurBox.classList.add('key-revealed', 'blur-0', 'select-all', 'pointer-events-auto');
+      }
+      if (overlay) overlay.classList.add('hidden');
+      if (badge) {
+        badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span><span>Revealed</span>`;
+        badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1';
+      }
+      if (btn) {
+        btn.innerHTML = `
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+          <span>Copy Private Key</span>
+        `;
+        btn.className = 'w-full py-3 px-4 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:to-teal-500 shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer';
+      }
+      showToast('Private key unblurred. Keep your screen protected!', 'warning', 3500);
+    } else {
+      // Step B: Copy action
+      if (currentExportedPrivateKey) {
+        copyToClipboard(currentExportedPrivateKey, 'Private Key');
+        if (btn) {
+          const originalHtml = btn.innerHTML;
+          const originalClass = btn.className;
+          btn.innerHTML = `
+            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            <span>Copied to Clipboard!</span>
+          `;
+          btn.className = 'w-full py-3 px-4 rounded-xl font-bold text-xs text-white bg-emerald-500 shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2 transition-all duration-200';
+          setTimeout(() => {
+            if (isPrivateKeyRevealed && btn) {
+              btn.innerHTML = originalHtml;
+              btn.className = originalClass;
+            }
+          }, 2000);
+        }
+      }
+    }
+  }
+  window.toggleRevealOrCopyKey = toggleRevealOrCopyKey;
 
   // Tab Switching (Overview, History, Settings, Admin)
   function setupTabs() {

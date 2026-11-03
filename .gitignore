@@ -5,9 +5,10 @@
 
 # SQLite Database Files
 *.sqlite
+*.sqlite*
 *.sqlite3
 *.db
-database/*.sqlite
+database/*.sqlite*
 
 # Logs & Storage
 storage/logs/*.log

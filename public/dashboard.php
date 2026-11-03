@@ -922,18 +922,23 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
 
   <!-- 4. Export Private Key Modal -->
   <div id="exportKeyModal" class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
-    <div class="glass-panel rounded-3xl max-w-md w-full p-6 border border-rose-500/40 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+    <div class="glass-panel rounded-3xl max-w-md w-full p-6 border border-rose-500/40 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto relative">
 
       <!-- Step 1: Verification -->
       <div id="exportKeyStep1" class="space-y-4">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-white">Security Check: Export Key</h3>
+              <p class="text-xs text-rose-300 font-medium">Verify your identity to decrypt your custodial wallet</p>
+            </div>
           </div>
-          <div>
-            <h3 class="text-base font-bold text-white">Security Check: Export Key</h3>
-            <p class="text-xs text-rose-300 font-medium">Verify your identity to decrypt your custodial wallet</p>
-          </div>
+          <button type="button" onclick="closeExportKeyModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
         </div>
 
         <div class="bg-rose-500/10 border border-rose-500/20 p-3 rounded-xl text-xs text-rose-300 leading-relaxed">
@@ -943,40 +948,91 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
         <div class="space-y-3">
           <div>
             <label class="block text-xs font-semibold text-slate-300 mb-1">Account Password</label>
-            <input type="password" id="exportKeyPassword" placeholder="••••••••••••" class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs">
+            <input type="password" id="exportKeyPassword" placeholder="••••••••••••" onkeydown="if(event.key === 'Enter') verifyAndRevealKey()" class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs">
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-300 mb-1">2FA Authenticator Code</label>
-            <input type="text" id="exportKeyTotp" maxlength="6" placeholder="6-digit TOTP code" class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs font-mono">
+            <input type="text" id="exportKeyTotp" maxlength="6" placeholder="6-digit TOTP code" onkeydown="if(event.key === 'Enter') verifyAndRevealKey()" class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs font-mono">
           </div>
         </div>
 
         <div class="flex justify-end gap-2 pt-2">
-          <button type="button" onclick="closeExportKeyModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300">Cancel</button>
-          <button type="button" id="submitExportKeyVerifyBtn" onclick="verifyAndRevealKey()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white">Verify & Reveal Key</button>
+          <button type="button" onclick="closeExportKeyModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300 hover:bg-slate-700 transition">Cancel</button>
+          <button type="button" id="submitExportKeyVerifyBtn" onclick="verifyAndRevealKey()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white shadow-lg shadow-rose-600/30 transition">Verify & Reveal Key</button>
         </div>
       </div>
 
-      <!-- Step 2: Revealed Key View -->
-      <div id="exportKeyStep2" class="space-y-4 hidden text-center">
-        <h3 class="text-base font-bold text-white">Your Custodial Solana Keypair</h3>
-        <p class="text-xs text-slate-400">Import this Base58 private key into Phantom or Solflare</p>
-
-        <div class="p-3 bg-slate-950 rounded-xl border border-white/10 text-left">
-          <div class="text-[10px] uppercase font-bold text-rose-400 mb-1">Raw Base58 Private Key</div>
-          <div id="rawPrivateKeyDisplay" class="font-mono text-xs text-emerald-400 break-all select-all bg-black/60 p-2.5 rounded-lg border border-white/5">
-            Loading...
+      <!-- Step 2: Revealed Key View with Box Blur & Reveal/Copy Toggle -->
+      <div id="exportKeyStep2" class="space-y-4 hidden">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-purple-500/20 text-purple-400 border border-purple-500/30 flex items-center justify-center">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-white">Custodial Solana Keypair</h3>
+              <p class="text-xs text-slate-400">Import this Base58 private key into Phantom or Solflare</p>
+            </div>
           </div>
+          <button type="button" onclick="closeExportKeyModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
         </div>
 
+        <!-- Deposit Address info row -->
+        <div class="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-900/80 border border-white/5 text-[11px]">
+          <span class="text-slate-400 font-mono">Deposit Address:</span>
+          <span id="exportKeyDepositAddress" class="text-slate-200 font-mono truncate max-w-[210px]"></span>
+        </div>
+
+        <!-- Box Blur Menu with the keys -->
+        <div class="p-4 bg-slate-950/90 rounded-2xl border border-white/10 text-left relative shadow-2xl backdrop-blur-xl space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1.5 text-[10px] uppercase font-bold text-rose-400 tracking-wider">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+              <span>Raw Base58 Private Key</span>
+            </div>
+            <span id="keyStatusBadge" class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse"></span>
+              <span>Encrypted in View</span>
+            </span>
+          </div>
+
+          <!-- Blurred Key Display Box -->
+          <div class="relative overflow-hidden rounded-xl border border-white/10 bg-black/80 my-2">
+            <div id="privateKeyBlurBox" class="key-blurred filter blur-md select-none pointer-events-none p-3.5 font-mono text-xs text-emerald-400 break-all leading-relaxed transition-all duration-300 min-h-[76px] flex items-center">
+              <span id="rawPrivateKeyDisplay">Loading...</span>
+            </div>
+            <div id="privateKeyOverlay" class="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[2px] transition-all duration-300 pointer-events-none">
+              <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/95 border border-white/10 text-[11px] font-medium text-slate-300 shadow-xl">
+                <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                <span>Click Reveal to unblur key</span>
+              </div>
+            </div>
+          </div>
+
+          <p class="text-[11px] text-slate-400 flex items-start gap-1.5 pt-1">
+            <svg class="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span>Anyone with this key has irreversible access to your Solana funds. Never disclose it.</span>
+          </p>
+        </div>
+
+        <!-- Action Button: Reveal -> changes to Copy -->
         <button type="button"
-                onclick="copyToClipboard(document.getElementById('rawPrivateKeyDisplay').innerText, 'Private Key')"
-                class="w-full py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-xs font-bold text-white transition">
-          Copy Private Key
+                id="revealCopyKeyBtn"
+                onclick="toggleRevealOrCopyKey()"
+                class="w-full py-3 px-4 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 shadow-lg shadow-purple-600/25 flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+          <span>Reveal Private Key</span>
         </button>
 
-        <button type="button" onclick="closeExportKeyModal()" class="w-full py-2 rounded-xl bg-slate-800 text-xs font-medium text-slate-300">
-          I Have Safely Saved It (Close)
+        <!-- Close Button -->
+        <button type="button"
+                id="closeExportKeyBtn"
+                onclick="closeExportKeyModal()"
+                class="w-full py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 text-xs font-semibold text-slate-300 hover:text-white border border-white/10 transition flex items-center justify-center gap-2 cursor-pointer">
+          <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          <span>Close</span>
         </button>
       </div>
 
