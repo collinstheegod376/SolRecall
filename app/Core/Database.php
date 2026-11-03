@@ -386,6 +386,25 @@ class Database
     }
 
     /**
+     * Get the active database driver ('mysql', 'pgsql', or 'sqlite').
+     */
+    public function getDriver(): string
+    {
+        return $this->config['driver'] ?? 'mysql';
+    }
+
+    /**
+     * Escape and quote an identifier (table or column name) safely across SQL dialects.
+     */
+    public function quoteIdentifier(string $identifier): string
+    {
+        if ($this->getDriver() === 'pgsql') {
+            return '"' . str_replace('"', '""', $identifier) . '"';
+        }
+        return '`' . str_replace('`', '``', $identifier) . '`';
+    }
+
+    /**
      * Execute a row-locking query (SELECT ... FOR UPDATE) for a single record.
      * Note: Must be executed within an active transaction.
      */

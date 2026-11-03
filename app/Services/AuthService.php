@@ -486,7 +486,9 @@ class AuthService
     public function login(User $user): void
     {
         ensure_session_started();
-        session_regenerate_id(true);
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            @session_regenerate_id(true);
+        }
 
         $sessionId = session_id();
         $userId = (int) $user->id;
@@ -497,17 +499,9 @@ class AuthService
         $ip = $_SERVER['REMOTE_ADDR'] ?? null;
         $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? null;
         $lifetime = (int) config('session.lifetime', 86400);
-        $expiresAt = date('Y-m-d H:i:s', time() + $lifetime);
 
         try {
-            $this->db->execute(
-                "INSERT INTO sessions (id, user_id, ip_address, user_agent, expires_at)
-                 VALUES (?, ?, ?, ?, ?)
-                 ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), ip_address = VALUES(ip_address),
-                                         user_agent = VALUES(user_agent), expires_at = VALUES(expires_at),
-                                         last_activity = CURRENT_TIMESTAMP",
-                [$sessionId, $userId, $ip, $userAgent, $expiresAt]
-            );
+            \App\Models\Session::createOrUpdate($sessionId, $userId, $lifetime, $ip, $userAgent);
         } catch (Throwable) {
             // Non-fatal if session table is unavailable
         }

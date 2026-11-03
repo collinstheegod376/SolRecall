@@ -42,17 +42,25 @@ class Session extends Model
         $db = static::getDb();
         $expiresAt = date('Y-m-d H:i:s', time() + $lifetimeSeconds);
 
-        $db->execute(
-            "INSERT INTO sessions (id, user_id, ip_address, user_agent, expires_at)
-             VALUES (?, ?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE 
-                user_id = VALUES(user_id),
-                ip_address = VALUES(ip_address),
-                user_agent = VALUES(user_agent),
-                expires_at = VALUES(expires_at),
-                last_activity = CURRENT_TIMESTAMP",
-            [$id, $userId, $ip, $ua, $expiresAt]
-        );
+        $existing = $db->fetch("SELECT id FROM sessions WHERE id = ? LIMIT 1", [$id]);
+        if ($existing) {
+            $db->execute(
+                "UPDATE sessions SET user_id = ?, ip_address = ?, user_agent = ?, expires_at = ?, last_activity = CURRENT_TIMESTAMP WHERE id = ?",
+                [$userId, $ip, $ua, $expiresAt, $id]
+            );
+        } else {
+            try {
+                $db->execute(
+                    "INSERT INTO sessions (id, user_id, ip_address, user_agent, expires_at) VALUES (?, ?, ?, ?, ?)",
+                    [$id, $userId, $ip, $ua, $expiresAt]
+                );
+            } catch (\Throwable) {
+                $db->execute(
+                    "UPDATE sessions SET user_id = ?, ip_address = ?, user_agent = ?, expires_at = ?, last_activity = CURRENT_TIMESTAMP WHERE id = ?",
+                    [$userId, $ip, $ua, $expiresAt, $id]
+                );
+            }
+        }
 
         return static::find($id) ?? new static([
             'id' => $id,

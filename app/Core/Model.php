@@ -85,14 +85,22 @@ abstract class Model implements JsonSerializable
     }
 
     /**
+     * Escape and quote an identifier using the active database driver.
+     */
+    protected static function quote(string $name): string
+    {
+        return static::getDb()->quoteIdentifier($name);
+    }
+
+    /**
      * Find a single record by primary key.
      */
     public static function find(mixed $id): ?static
     {
-        $table = static::getTableName();
-        $pk = static::getPrimaryKey();
+        $table = static::quote(static::getTableName());
+        $pk = static::quote(static::getPrimaryKey());
 
-        $row = static::getDb()->fetch("SELECT * FROM `{$table}` WHERE `{$pk}` = ? LIMIT 1", [$id]);
+        $row = static::getDb()->fetch("SELECT * FROM {$table} WHERE {$pk} = ? LIMIT 1", [$id]);
         return $row ? new static($row, true) : null;
     }
 
@@ -115,8 +123,9 @@ abstract class Model implements JsonSerializable
      */
     public static function where(string $column, mixed $value, string $operator = '='): array
     {
-        $table = static::getTableName();
-        $rows = static::getDb()->fetchAll("SELECT * FROM `{$table}` WHERE `{$column}` {$operator} ?", [$value]);
+        $table = static::quote(static::getTableName());
+        $col = static::quote($column);
+        $rows = static::getDb()->fetchAll("SELECT * FROM {$table} WHERE {$col} {$operator} ?", [$value]);
 
         $results = [];
         foreach ($rows as $row) {
@@ -130,8 +139,9 @@ abstract class Model implements JsonSerializable
      */
     public static function firstWhere(string $column, mixed $value, string $operator = '='): ?static
     {
-        $table = static::getTableName();
-        $row = static::getDb()->fetch("SELECT * FROM `{$table}` WHERE `{$column}` {$operator} ? LIMIT 1", [$value]);
+        $table = static::quote(static::getTableName());
+        $col = static::quote($column);
+        $row = static::getDb()->fetch("SELECT * FROM {$table} WHERE {$col} {$operator} ? LIMIT 1", [$value]);
         return $row ? new static($row, true) : null;
     }
 
@@ -142,11 +152,11 @@ abstract class Model implements JsonSerializable
      */
     public static function all(string $orderBy = '', string $direction = 'ASC'): array
     {
-        $table = static::getTableName();
-        $sql = "SELECT * FROM `{$table}`";
+        $table = static::quote(static::getTableName());
+        $sql = "SELECT * FROM {$table}";
         if ($orderBy !== '') {
             $dir = strtoupper($direction) === 'DESC' ? 'DESC' : 'ASC';
-            $sql .= " ORDER BY `{$orderBy}` {$dir}";
+            $sql .= " ORDER BY " . static::quote($orderBy) . " {$dir}";
         }
 
         $rows = static::getDb()->fetchAll($sql);
@@ -162,11 +172,12 @@ abstract class Model implements JsonSerializable
      */
     public static function count(string $column = '*', ?string $whereColumn = null, mixed $whereValue = null): int
     {
-        $table = static::getTableName();
-        $sql = "SELECT COUNT({$column}) FROM `{$table}`";
+        $table = static::quote(static::getTableName());
+        $colTarget = ($column === '*') ? '*' : static::quote($column);
+        $sql = "SELECT COUNT({$colTarget}) FROM {$table}";
         $params = [];
         if ($whereColumn !== null) {
-            $sql .= " WHERE `{$whereColumn}` = ?";
+            $sql .= " WHERE " . static::quote($whereColumn) . " = ?";
             $params[] = $whereValue;
         }
 
@@ -214,15 +225,18 @@ abstract class Model implements JsonSerializable
                 return true;
             }
 
+            $qTable = $db->quoteIdentifier($table);
+            $qPk = $db->quoteIdentifier($pk);
+
             $fields = [];
             $values = [];
             foreach ($dirty as $col => $val) {
-                $fields[] = "`{$col}` = ?";
+                $fields[] = $db->quoteIdentifier($col) . " = ?";
                 $values[] = $val;
             }
 
             $values[] = $this->attributes[$pk] ?? null;
-            $sql = "UPDATE `{$table}` SET " . implode(', ', $fields) . " WHERE `{$pk}` = ?";
+            $sql = "UPDATE {$qTable} SET " . implode(', ', $fields) . " WHERE {$qPk} = ?";
             $db->execute($sql, $values);
 
             $this->original = $this->attributes;
@@ -238,7 +252,10 @@ abstract class Model implements JsonSerializable
         $cols = array_keys($filtered);
         $placeholders = array_fill(0, count($cols), '?');
 
-        $sql = "INSERT INTO `{$table}` (`" . implode('`, `', $cols) . "`) VALUES (" . implode(', ', $placeholders) . ")";
+        $qTable = $db->quoteIdentifier($table);
+        $quotedCols = array_map([$db, 'quoteIdentifier'], $cols);
+
+        $sql = "INSERT INTO {$qTable} (" . implode(', ', $quotedCols) . ") VALUES (" . implode(', ', $placeholders) . ")";
         $db->execute($sql, array_values($filtered));
 
         $insertId = $db->lastInsertId();
@@ -277,7 +294,10 @@ abstract class Model implements JsonSerializable
             return false;
         }
 
-        static::getDb()->execute("DELETE FROM `{$table}` WHERE `{$pk}` = ?", [$id]);
+        $db = static::getDb();
+        $qTable = $db->quoteIdentifier($table);
+        $qPk = $db->quoteIdentifier($pk);
+        $db->execute("DELETE FROM {$qTable} WHERE {$qPk} = ?", [$id]);
         $this->exists = false;
         return true;
     }
