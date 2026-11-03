@@ -371,28 +371,106 @@
 
     // Render Balance Cards
     const balances = AppState.balances;
-    let totalEscrowUsd = 0;
+    const solPrice = (balances.SOL && balances.SOL.price) ? balances.SOL.price : 185.0;
 
     ['SOL', 'USDC', 'USDT'].forEach(tok => {
-      const data = balances[tok] || { available: 0, escrow: 0, price: 1 };
+      const defaultPrice = tok === 'SOL' ? solPrice : 1.0;
+      const data = balances[tok] || { available: 0, escrow: 0, price: defaultPrice };
+      if (!data.price) data.price = defaultPrice;
+
       const availEl = document.getElementById(`bal-avail-${tok.toLowerCase()}`);
       const escrowEl = document.getElementById(`bal-escrow-${tok.toLowerCase()}`);
       const fiatEl = document.getElementById(`bal-fiat-${tok.toLowerCase()}`);
 
-      if (availEl) availEl.textContent = formatAmount(data.available, tok === 'SOL' ? 4 : 2);
-      if (escrowEl) escrowEl.textContent = formatAmount(data.escrow, tok === 'SOL' ? 4 : 2);
+      const availNum = parseFloat(data.available) || 0;
+      const escrowNum = parseFloat(data.escrow) || 0;
 
-      const totalTok = (data.available || 0) + (data.escrow || 0);
-      const fiatTotal = totalTok * (data.price || 1);
+      if (availEl) availEl.textContent = formatAmount(availNum, tok === 'SOL' ? 4 : 2);
+      if (escrowEl) escrowEl.textContent = formatAmount(escrowNum, tok === 'SOL' ? 4 : 2);
+
+      const totalTok = availNum + escrowNum;
+      const fiatTotal = totalTok * data.price;
       if (fiatEl) fiatEl.textContent = `≈ $${formatAmount(fiatTotal, 2)}`;
-
-      totalEscrowUsd += (data.escrow || 0) * (data.price || 1);
     });
 
-    // Total Escrow Shield Pill
+    // Total Escrow Shield Pill with multi-token awareness
     const totalEscrowEl = document.getElementById('totalEscrowShielded');
+    const breakdownBadgesEl = document.getElementById('escrowBreakdownBadges');
+    const escrowSubtextEl = document.getElementById('escrowProtectedSubtext');
+
+    // Compute escrow from active pending transfers array as well as balance table
+    let pendingSol = 0;
+    let pendingUsdc = 0;
+    let pendingUsdt = 0;
+    if (Array.isArray(AppState.pendingTransfers)) {
+      AppState.pendingTransfers.forEach(t => {
+        if (t.status === 'pending') {
+          const amt = parseFloat(t.amount) || 0;
+          if (t.token === 'SOL') pendingSol += amt;
+          else if (t.token === 'USDC') pendingUsdc += amt;
+          else if (t.token === 'USDT') pendingUsdt += amt;
+        }
+      });
+    }
+
+    const solEscrow = Math.max(parseFloat(balances.SOL ? balances.SOL.escrow : 0) || 0, pendingSol);
+    const usdcEscrow = Math.max(parseFloat(balances.USDC ? balances.USDC.escrow : 0) || 0, pendingUsdc);
+    const usdtEscrow = Math.max(parseFloat(balances.USDT ? balances.USDT.escrow : 0) || 0, pendingUsdt);
+    const stablesEscrow = usdcEscrow + usdtEscrow;
+    const activeHoldCount = Array.isArray(AppState.pendingTransfers)
+      ? AppState.pendingTransfers.filter(t => t.status === 'pending').length
+      : 0;
+
     if (totalEscrowEl) {
-      totalEscrowEl.textContent = `$${formatAmount(totalEscrowUsd, 2)}`;
+      if (solEscrow > 0 && stablesEscrow > 0) {
+        totalEscrowEl.innerHTML = `
+          <span class="font-mono text-white text-2xl font-black">${formatAmount(solEscrow, 4)}</span>
+          <span class="text-xs font-bold text-amber-400 font-sans tracking-normal ml-1">SOL</span>
+          <span class="text-slate-400 text-sm font-sans mx-2">+</span>
+          <span class="font-mono text-emerald-400 text-2xl font-black">$${formatAmount(stablesEscrow, 2)}</span>
+        `;
+      } else if (solEscrow > 0) {
+        totalEscrowEl.innerHTML = `
+          <span class="font-mono text-white text-3xl font-black tracking-tight">${formatAmount(solEscrow, 4)}</span>
+          <span class="text-sm font-bold text-amber-400 font-sans tracking-normal ml-1.5">SOL</span>
+        `;
+      } else if (stablesEscrow > 0) {
+        totalEscrowEl.innerHTML = `
+          <span class="font-mono text-emerald-400 text-3xl font-black tracking-tight">$${formatAmount(stablesEscrow, 2)}</span>
+          <span class="text-xs font-bold text-slate-300 font-sans ml-1.5">${usdcEscrow > 0 && usdtEscrow > 0 ? 'USDC + USDT' : (usdcEscrow > 0 ? 'USDC' : 'USDT')}</span>
+        `;
+      } else {
+        totalEscrowEl.innerHTML = `<span class="font-mono text-slate-400 text-2xl font-black">0.0000 SOL</span>`;
+      }
+    }
+
+    if (breakdownBadgesEl) {
+      const badges = [];
+      if (solEscrow > 0) {
+        const fiatVal = (solEscrow * solPrice).toFixed(2);
+        badges.push(`<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-purple-500/15 text-purple-300 border border-purple-500/30">
+          <span class="w-1.5 h-1.5 rounded-full bg-purple-400"></span> ${formatAmount(solEscrow, 4)} SOL (≈$${fiatVal})
+        </span>`);
+      }
+      if (usdcEscrow > 0) {
+        badges.push(`<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-blue-500/15 text-blue-300 border border-blue-500/30">
+          <span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span> $${formatAmount(usdcEscrow, 2)} USDC
+        </span>`);
+      }
+      if (usdtEscrow > 0) {
+        badges.push(`<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> $${formatAmount(usdtEscrow, 2)} USDT
+        </span>`);
+      }
+      breakdownBadgesEl.innerHTML = badges.join('');
+    }
+
+    if (escrowSubtextEl) {
+      if (activeHoldCount > 0) {
+        escrowSubtextEl.textContent = `${activeHoldCount} active hold${activeHoldCount > 1 ? 's' : ''} in undo window. Revocable instantly before countdown elapses.`;
+      } else {
+        escrowSubtextEl.textContent = 'Funds in the undo window can be revoked instantly before the countdown elapses.';
+      }
     }
 
     // Pending Count Badge in Header

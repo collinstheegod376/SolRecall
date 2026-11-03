@@ -155,14 +155,12 @@ class TransferService
                     [$amount, $amount, $userId, $token]
                 );
 
-                // Insert pending transfer record
-                $db->execute(
+                // Insert pending transfer record with RETURNING id
+                $transferId = (int) $db->fetchColumn(
                     "INSERT INTO pending_transfers (user_id, token, amount, destination, note, expires_at, status) 
-                     VALUES (?, ?, ?, ?, ?, ?, 'pending')",
+                     VALUES (?, ?, ?, ?, ?, ?, 'pending') RETURNING id",
                     [$userId, $token, $amount, $destination, $note, $expiresAt]
                 );
-
-                $transferId = (int) $db->lastInsertId();
                 $humanDuration = self::formatHumanDuration($windowMinutes);
 
                 return [
@@ -311,13 +309,11 @@ class TransferService
             $now = date('Y-m-d H:i:s');
 
             // Insert as processing
-            $db->execute(
+            return (int) $db->fetchColumn(
                 "INSERT INTO pending_transfers (user_id, token, amount, destination, note, expires_at, status)
-                 VALUES (?, ?, ?, ?, ?, ?, 'processing')",
+                 VALUES (?, ?, ?, ?, ?, ?, 'processing') RETURNING id",
                 [$userId, $token, $amount, $destination, $note, $now]
             );
-
-            return (int) $db->lastInsertId();
         });
 
         // Step 2: Resolve signing key and broadcast on-chain
@@ -674,16 +670,16 @@ class TransferService
     public function getPendingTransfers(int $userId, bool $isAdmin = false): array
     {
         if ($isAdmin) {
-            $sql = 'SELECT pt.*, u.username, u.email 
+            $sql = "SELECT pt.*, u.username, u.email 
                     FROM pending_transfers pt 
                     JOIN users u ON pt.user_id = u.id 
-                    WHERE pt.status = "pending" 
-                    ORDER BY pt.expires_at ASC';
+                    WHERE pt.status = 'pending' 
+                    ORDER BY pt.expires_at ASC";
             $params = [];
         } else {
-            $sql = 'SELECT * FROM pending_transfers 
-                    WHERE user_id = ? AND status = "pending" 
-                    ORDER BY expires_at ASC';
+            $sql = "SELECT * FROM pending_transfers 
+                    WHERE user_id = ? AND status = 'pending' 
+                    ORDER BY expires_at ASC";
             $params = [$userId];
         }
 
@@ -711,10 +707,10 @@ class TransferService
      */
     public function getTransferHistory(int $userId, int $limit = 50, int $offset = 0): array
     {
-        $sql = 'SELECT * FROM pending_transfers 
-                WHERE user_id = ? AND status IN ("completed", "cancelled", "failed") 
+        $sql = "SELECT * FROM pending_transfers 
+                WHERE user_id = ? AND status IN ('completed', 'cancelled', 'failed') 
                 ORDER BY created_at DESC 
-                LIMIT ? OFFSET ?';
+                LIMIT ? OFFSET ?";
 
         $rows = $this->db->fetchAll($sql, [$userId, $limit, $offset]);
 

@@ -49,7 +49,7 @@ unset($_SESSION['flash_error'], $_SESSION['flash_success']);
     }
   </script>
   <!-- Custom Styles -->
-  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="/assets/css/style.css?v=<?= file_exists(__DIR__ . '/assets/css/style.css') ? filemtime(__DIR__ . '/assets/css/style.css') : '1.1' ?>">
 </head>
 <body class="min-h-screen bg-[#07090e] text-slate-100 flex flex-col justify-between selection:bg-purple-500 selection:text-white">
 
@@ -192,7 +192,7 @@ unset($_SESSION['flash_error'], $_SESSION['flash_success']);
   <div id="toast-container"></div>
 
   <!-- Scripts -->
-  <script src="/assets/js/wallet.js"></script>
+  <script src="/assets/js/wallet.js?v=<?= file_exists(__DIR__ . '/assets/js/wallet.js') ? filemtime(__DIR__ . '/assets/js/wallet.js') : '1.1' ?>"></script>
   <script>
     // Connect Wallet Button
     const connectWalletBtn = document.getElementById('connectWalletBtn');

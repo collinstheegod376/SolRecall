@@ -72,7 +72,7 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
     }
   </script>
   <!-- Custom Styles -->
-  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="/assets/css/style.css?v=<?= file_exists(__DIR__ . '/assets/css/style.css') ? filemtime(__DIR__ . '/assets/css/style.css') : '1.1' ?>">
 </head>
 <body class="min-h-screen bg-[#07090e] text-slate-100 flex flex-col justify-between selection:bg-purple-500 selection:text-white pb-28 sm:pb-32 md:pb-8">
 
@@ -305,16 +305,17 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
           <!-- Escrow Shield Summary Card -->
           <div class="glass-panel rounded-2xl p-5 relative overflow-hidden border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-transparent to-purple-600/10">
             <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+              <span class="text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5 font-sans">
                 <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                 Escrow Protected
               </span>
               <span id="pendingTransfersCount" class="hidden">0</span>
             </div>
-            <div class="text-2xl font-black text-white font-mono tracking-tight mt-1" id="totalEscrowShielded">
-              $0.00
+            <div class="text-2xl font-black text-white font-mono tracking-tight mt-1 flex items-baseline gap-2 flex-wrap" id="totalEscrowShielded">
+              0.0000 SOL
             </div>
-            <p class="text-[11px] text-slate-300 mt-2 leading-relaxed">
+            <div id="escrowBreakdownBadges" class="flex items-center gap-1.5 mt-2 flex-wrap"></div>
+            <p class="text-[11px] text-slate-300 mt-2 leading-relaxed" id="escrowProtectedSubtext">
               Funds in the undo window can be revoked instantly before the countdown elapses.
             </p>
           </div>
@@ -1078,8 +1079,8 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
     }
   </script>
 
-  <!-- Core JavaScript modules -->
-  <script src="/assets/js/wallet.js"></script>
-  <script src="/assets/js/dashboard.js"></script>
+  <!-- Core JavaScript modules with automatic cache busting -->
+  <script src="/assets/js/wallet.js?v=<?= file_exists(__DIR__ . '/assets/js/wallet.js') ? filemtime(__DIR__ . '/assets/js/wallet.js') : '1.1' ?>"></script>
+  <script src="/assets/js/dashboard.js?v=<?= file_exists(__DIR__ . '/assets/js/dashboard.js') ? filemtime(__DIR__ . '/assets/js/dashboard.js') : '1.1' ?>"></script>
 </body>
 </html>
