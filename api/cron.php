@@ -12,9 +12,14 @@ declare(strict_types=1);
 // Set JSON header immediately
 header('Content-Type: application/json; charset=utf-8');
 
-// 1. Security token verification (Vercel provides Authorization: Bearer <CRON_SECRET>)
+// 1. Security token verification
+// Vercel Cron sends Authorization: Bearer <CRON_SECRET>
+// Local development (localhost / 127.0.0.1 / CLI) is automatically permitted
 $cronSecret = $_ENV['CRON_SECRET'] ?? getenv('CRON_SECRET') ?: null;
-if ($cronSecret) {
+$clientIp = $_SERVER['REMOTE_ADDR'] ?? '';
+$isLocal = in_array($clientIp, ['127.0.0.1', '::1', 'localhost'], true) || (php_sapi_name() === 'cli');
+
+if ($cronSecret && !$isLocal) {
     $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
     $querySecret = $_GET['secret'] ?? '';
     $bearerMatch = preg_match('/Bearer\s+(\S+)/i', $authHeader, $matches) ? $matches[1] : '';

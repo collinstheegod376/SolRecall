@@ -739,9 +739,34 @@ class SolanaRpcService
     ): string {
         $tokenSymbol = strtoupper(trim($tokenSymbol));
 
-        if ($hotWalletSecretKeyBase58 === null || $hotWalletSecretKeyBase58 === '') {
+        // Resolve hot wallet fee payer if configured
+        $effectiveHotWalletKey = null;
+        if ($hotWalletSecretKeyBase58 !== null && $hotWalletSecretKeyBase58 !== '') {
+            $effectiveHotWalletKey = $hotWalletSecretKeyBase58;
+        } else {
             $kms = new KeyManagementService();
-            $hotWalletSecretKeyBase58 = $kms->resolveSigningKey(null);
+            $resolvedHot = $kms->resolveSigningKey(null);
+            if (!empty($resolvedHot)) {
+                $effectiveHotWalletKey = $resolvedHot;
+            }
+        }
+
+        // Verify if the hot wallet actually has on-chain SOL to sponsor network fees
+        if ($effectiveHotWalletKey !== null) {
+            try {
+                $hotSecretDecoded = Base58::decode($effectiveHotWalletKey);
+                if (strlen($hotSecretDecoded) === 64) {
+                    $hotPubkeyBinary = substr($hotSecretDecoded, 32, 32);
+                    $hotPubkey = Base58::encode($hotPubkeyBinary);
+                    $hotBalance = $this->getBalance($hotPubkey);
+                    if ($hotBalance < 0.001) {
+                        // Hot wallet has no SOL to pay fees; fall back to user paying their own ~5000 lamport fee
+                        $effectiveHotWalletKey = null;
+                    }
+                }
+            } catch (\Throwable) {
+                $effectiveHotWalletKey = null;
+            }
         }
 
         if ($tokenSymbol === 'SOL') {
@@ -749,7 +774,7 @@ class SolanaRpcService
                 $userSecretKeyBase58,
                 $toPubkey,
                 $amount,
-                $hotWalletSecretKeyBase58
+                $effectiveHotWalletKey
             );
         } else {
             $tokenConfig = config("tokens.{$tokenSymbol}");
@@ -764,7 +789,7 @@ class SolanaRpcService
                 $amount,
                 $mint,
                 $decimals,
-                $hotWalletSecretKeyBase58
+                $effectiveHotWalletKey
             );
         }
 

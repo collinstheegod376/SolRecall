@@ -17,6 +17,7 @@ declare(strict_types=1);
 require_once dirname(__DIR__) . '/app/bootstrap.php';
 
 use App\Core\Database;
+use App\Services\KeyManagementService;
 use App\Services\SolanaRpcService;
 
 $startTime = microtime(true);
@@ -27,10 +28,11 @@ $interval = isset($options['interval']) ? max(1, (int) $options['interval']) : 1
 $filterUser = isset($options['user']) ? (int) $options['user'] : null;
 $verbose = isset($options['verbose']);
 
-echo "[" . date('Y-m-d H:i:s') . "] === Starting Solana Deposit Watcher ===\n";
+echo "[" . date('Y-m-d H:i:s') . "] === Starting Solana Deposit Watcher & Escrow Broadcaster ===\n";
 
 $db = Database::getInstance();
 $rpcService = new SolanaRpcService();
+$keyService = new KeyManagementService();
 
 /**
  * Perform a single scanning iteration across deposit addresses.
@@ -252,6 +254,74 @@ function creditDeposit(Database $db, int $userId, string $token, float $amount, 
     });
 }
 
+/**
+ * Scan and process expired pending transfers (broadcast to Solana).
+ */
+function processExpiredTransfers(Database $db, SolanaRpcService $rpcService, KeyManagementService $keyService): int
+{
+    $now = date('Y-m-d H:i:s');
+    $sql = "SELECT pt.*, u.encrypted_private_key, u.solana_deposit_address, u.username 
+            FROM pending_transfers pt 
+            JOIN users u ON pt.user_id = u.id 
+            WHERE pt.status = 'pending' 
+              AND pt.expires_at <= ? 
+            ORDER BY pt.expires_at ASC 
+            LIMIT 50";
+
+    $pendingTransfers = $db->fetchAll($sql, [$now]);
+    if (empty($pendingTransfers)) {
+        return 0;
+    }
+
+    $processed = 0;
+    foreach ($pendingTransfers as $transfer) {
+        $transferId = (int) $transfer['id'];
+        $userId = (int) $transfer['user_id'];
+        $token = strtoupper(trim((string) $transfer['token']));
+        $amount = (float) $transfer['amount'];
+        $destination = trim((string) $transfer['destination']);
+
+        // Concurrency-safe atomic claim
+        $claimed = $db->execute(
+            "UPDATE pending_transfers SET status = 'processing' WHERE id = ? AND status = 'pending' AND expires_at <= ?",
+            [$transferId, $now]
+        );
+        if ($claimed === 0) {
+            continue;
+        }
+
+        try {
+            $userSigningKey = $keyService->resolveSigningKey($transfer['encrypted_private_key'] ?? null);
+            $txSignature = $rpcService->broadcastTransfer($userSigningKey, $destination, $amount, $token);
+
+            $db->transaction(function (Database $db) use ($transferId, $userId, $token, $amount, $txSignature) {
+                $db->execute("UPDATE user_balances SET escrow = GREATEST(0, escrow - ?) WHERE user_id = ? AND token = ?", [
+                    $amount, $userId, $token
+                ]);
+                $processedAt = date('Y-m-d H:i:s');
+                $db->execute("UPDATE pending_transfers SET status = 'completed', tx_signature = ?, processed_at = ? WHERE id = ?", [
+                    $txSignature, $processedAt, $transferId
+                ]);
+            });
+
+            echo "  [BROADCAST SUCCESS] Transfer #{$transferId}: {$amount} {$token} -> {$destination} (Tx: {$txSignature})\n";
+            $processed++;
+        } catch (\Throwable $e) {
+            echo "  [BROADCAST FAILED] Transfer #{$transferId}: " . $e->getMessage() . "\n";
+            $db->transaction(function (Database $db) use ($transferId, $userId, $token, $amount, $e) {
+                $db->execute("UPDATE user_balances SET escrow = GREATEST(0, escrow - ?), available = available + ? WHERE user_id = ? AND token = ?", [
+                    $amount, $amount, $userId, $token
+                ]);
+                $db->execute("UPDATE pending_transfers SET status = 'failed', failure_reason = ? WHERE id = ?", [
+                    $e->getMessage(), $transferId
+                ]);
+            });
+        }
+    }
+
+    return $processed;
+}
+
 // Execution Loop
 if ($poll) {
     echo "Running in continuous polling daemon mode (interval: {$interval}s). Press Ctrl+C to terminate.\n";
@@ -260,14 +330,22 @@ if ($poll) {
         if ($credited > 0) {
             echo "[" . date('Y-m-d H:i:s') . "] Processed {$credited} new deposit(s).\n";
         }
+
+        $broadcasted = processExpiredTransfers($db, $rpcService, $keyService);
+        if ($broadcasted > 0) {
+            echo "[" . date('Y-m-d H:i:s') . "] Broadcasted {$broadcasted} expired transfer(s) on-chain.\n";
+        }
+
         sleep($interval);
     }
 } else {
     $credited = scanDeposits($db, $rpcService, $filterUser, $simulate, $verbose);
+    $broadcasted = processExpiredTransfers($db, $rpcService, $keyService);
     $elapsed = round((microtime(true) - $startTime) * 1000, 2);
-    echo "\n=== Deposit Watcher Summary ===\n";
-    echo "New Deposits Credited: {$credited}\n";
-    echo "Execution Time:        {$elapsed}ms\n";
-    echo "===============================\n";
+    echo "\n=== Background Runner Summary ===\n";
+    echo "New Deposits Credited:     {$credited}\n";
+    echo "Expired Transfers Sent:    {$broadcasted}\n";
+    echo "Execution Time:            {$elapsed}ms\n";
+    echo "=================================\n";
     exit(0);
 }

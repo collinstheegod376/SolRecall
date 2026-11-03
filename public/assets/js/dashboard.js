@@ -560,6 +560,13 @@
   async function handleExpiredTransfers() {
     showToast('Undo window expired. Broadcaster processing on Solana...', 'info');
 
+    try {
+      // Trigger cron broadcast on server
+      await apiFetch('/api/cron');
+    } catch (err) {
+      console.warn('Cron broadcast trigger:', err.message);
+    }
+
     setTimeout(async () => {
       try {
         const [balRes, pendRes, histRes] = await Promise.all([
