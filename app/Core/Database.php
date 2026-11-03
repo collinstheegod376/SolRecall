@@ -10,10 +10,10 @@ use PDOStatement;
 use RuntimeException;
 
 /**
- * Database Singleton & Query Helper
+ * Pure Supabase Database Singleton & Query Engine
  *
- * Manages PDO connection, atomic transactions, row-locking queries,
- * and parameterized SQL execution.
+ * Dedicated PostgreSQL driver for Supabase transaction pooler and direct connections.
+ * Enforces atomic transactions, row-locking queries (FOR UPDATE), and parameterized execution.
  */
 class Database
 {
@@ -79,165 +79,39 @@ class Database
     }
 
     /**
-     * Establish the PDO connection using stored configuration.
+     * Establish the PDO connection to Supabase PostgreSQL.
      */
     private function connect(): void
     {
-        $driver = $this->config['driver'] ?? 'mysql';
-        $host = $this->config['host'] ?? '127.0.0.1';
-        $port = $this->config['port'] ?? 3306;
-        $database = $this->config['database'] ?? 'undo_transfers';
-        $username = $this->config['username'] ?? 'root';
+        $driver = $this->config['driver'] ?? 'pgsql';
+        $host = $this->config['host'] ?? 'aws-0-eu-west-1.pooler.supabase.com';
+        $port = (int) ($this->config['port'] ?? 6543);
+        $database = $this->config['database'] ?? 'postgres';
+        $username = $this->config['username'] ?? 'postgres.ouwxjoqredxaacdqmsht';
         $password = $this->config['password'] ?? '';
-        $charset = $this->config['charset'] ?? 'utf8mb4';
+        $sslmode = $this->config['sslmode'] ?? 'require';
 
         $options = $this->config['options'] ?? [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES => false,
+            PDO::ATTR_STRINGIFY_FETCHES => false,
         ];
 
-        if ($driver === 'sqlite') {
-            $dsn = "sqlite:{$database}";
-            unset($options[PDO::MYSQL_ATTR_INIT_COMMAND]);
-        } elseif ($driver === 'pgsql') {
-            $sslmode = $this->config['sslmode'] ?? 'prefer';
-            $dsn = "pgsql:host={$host};port={$port};dbname={$database};sslmode={$sslmode}";
-            unset($options[PDO::MYSQL_ATTR_INIT_COMMAND]);
-        } else {
-            $dsn = "{$driver}:host={$host};port={$port};dbname={$database};charset={$charset}";
-            if (!isset($options[PDO::MYSQL_ATTR_INIT_COMMAND])) {
-                $options[PDO::MYSQL_ATTR_INIT_COMMAND] = 'SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci';
-            }
-        }
+        // Format PostgreSQL DSN for Supabase
+        $dsn = "pgsql:host={$host};port={$port};dbname={$database};sslmode={$sslmode}";
 
         try {
             $this->pdo = new PDO($dsn, $username, $password, $options);
-            if ($driver === 'sqlite') {
-                $this->pdo->exec('PRAGMA foreign_keys = ON;');
-                $this->pdo->exec('PRAGMA journal_mode = WAL;');
-            } elseif ($driver === 'pgsql') {
-                $this->pdo->exec("SET NAMES 'UTF8';");
-            }
+            $this->pdo->exec("SET NAMES 'UTF8';");
         } catch (PDOException $e) {
-            // If MySQL or PgSQL (Supabase) is unreachable or driver is missing in local environment, fall back to SQLite
-            $errMsg = strtolower($e->getMessage());
-            $isLocalFallback = str_contains($errMsg, '2002')
-                || str_contains($errMsg, 'refused')
-                || str_contains($errMsg, 'could not find driver')
-                || str_contains($errMsg, 'getaddrinfo')
-                || str_contains($errMsg, 'timeout');
-
-            if ($isLocalFallback) {
-                $sqlitePath = dirname(__DIR__, 2) . '/database/undo_transfers.sqlite';
-                $this->config['driver'] = 'sqlite';
-                $this->config['database'] = $sqlitePath;
-                $this->pdo = new PDO("sqlite:{$sqlitePath}", null, null, [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                    PDO::ATTR_EMULATE_PREPARES => false,
-                ]);
-                $this->pdo->exec('PRAGMA foreign_keys = ON;');
-                $this->pdo->exec('PRAGMA journal_mode = WAL;');
-                $this->initializeSqliteSchema();
-                return;
-            }
-            throw new RuntimeException("Database connection failed: " . $e->getMessage(), (int) $e->getCode(), $e);
-        }
-    }
-
-    /**
-     * Initialize schema and seed data when using SQLite fallback.
-     */
-    private function initializeSqliteSchema(): void
-    {
-        $this->pdo->exec("
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE,
-                email TEXT UNIQUE,
-                password_hash TEXT,
-                google_id TEXT,
-                wallet_address TEXT,
-                solana_deposit_address TEXT,
-                encrypted_private_key TEXT,
-                two_factor_secret TEXT,
-                two_factor_enabled INTEGER DEFAULT 0,
-                is_admin INTEGER DEFAULT 0,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            throw new RuntimeException(
+                "Supabase PostgreSQL database connection failed: " . $e->getMessage() . 
+                " [Host: {$host}:{$port}, Database: {$database}, User: {$username}]. " .
+                "Please verify your Supabase DB_PASSWORD in .env or Vercel dashboard.",
+                (int) $e->getCode(),
+                $e
             );
-
-            CREATE TABLE IF NOT EXISTS user_balances (
-                user_id INTEGER NOT NULL,
-                token TEXT NOT NULL,
-                available NUMERIC NOT NULL DEFAULT 0,
-                escrow NUMERIC NOT NULL DEFAULT 0,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (user_id, token),
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-            );
-
-            CREATE TABLE IF NOT EXISTS pending_transfers (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                token TEXT NOT NULL,
-                amount NUMERIC NOT NULL,
-                destination TEXT NOT NULL,
-                note TEXT,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                expires_at DATETIME NOT NULL,
-                status TEXT DEFAULT 'pending',
-                tx_signature TEXT,
-                cancelled_at DATETIME,
-                processed_at DATETIME,
-                failure_reason TEXT,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-            );
-
-            CREATE TABLE IF NOT EXISTS deposits (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                token TEXT NOT NULL,
-                amount NUMERIC NOT NULL,
-                tx_signature TEXT,
-                status TEXT DEFAULT 'pending',
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                confirmed_at DATETIME,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-            );
-
-            CREATE TABLE IF NOT EXISTS sessions (
-                id TEXT PRIMARY KEY,
-                user_id INTEGER NOT NULL,
-                data TEXT,
-                ip_address TEXT,
-                user_agent TEXT,
-                expires_at DATETIME NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                last_activity DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-            );
-        ");
-
-        // Seed initial data if users table is empty
-        $stmt = $this->pdo->query('SELECT COUNT(*) FROM users');
-        $count = (int) $stmt->fetchColumn();
-        if ($count === 0) {
-            $this->pdo->exec("
-                INSERT INTO users (id, username, email, password_hash, wallet_address, solana_deposit_address, two_factor_enabled, is_admin)
-                VALUES 
-                (1, 'demo_user', 'demo@solanaundo.local', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU', '4Nd1mBQtrMJVYVfKf2PJy9NZWMdEcES25HozHP84TX35', 0, 0),
-                (2, 'admin', 'admin@solanaundo.local', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'DYw8jCTfwHNRJhhmFcbXvVDTqWMEVFBX6ZKUmG5CNSKK', '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM', 0, 1);
-
-                INSERT INTO user_balances (user_id, token, available, escrow) VALUES 
-                (1, 'SOL',  5.25000000, 0.50000000),
-                (1, 'USDC', 250.00000000, 25.00000000),
-                (1, 'USDT', 150.00000000, 0.00000000),
-                (2, 'SOL',  50.00000000, 0.00000000),
-                (2, 'USDC', 2500.00000000, 0.00000000),
-                (2, 'USDT', 1500.00000000, 0.00000000);
-            ");
         }
     }
 
@@ -386,22 +260,19 @@ class Database
     }
 
     /**
-     * Get the active database driver ('mysql', 'pgsql', or 'sqlite').
+     * Get the active database driver ('pgsql' for Supabase).
      */
     public function getDriver(): string
     {
-        return $this->config['driver'] ?? 'mysql';
+        return 'pgsql';
     }
 
     /**
-     * Escape and quote an identifier (table or column name) safely across SQL dialects.
+     * Escape and quote an identifier (table or column name) safely in PostgreSQL syntax.
      */
     public function quoteIdentifier(string $identifier): string
     {
-        if ($this->getDriver() === 'pgsql') {
-            return '"' . str_replace('"', '""', $identifier) . '"';
-        }
-        return '`' . str_replace('`', '``', $identifier) . '`';
+        return '"' . str_replace('"', '""', $identifier) . '"';
     }
 
     /**
@@ -410,10 +281,7 @@ class Database
      */
     public function selectForUpdate(string $sql, array $params = []): ?array
     {
-        $driver = $this->config['driver'] ?? 'mysql';
-        if ($driver === 'sqlite') {
-            $sql = preg_replace('/\s+FOR\s+UPDATE\s*$/i', '', $sql);
-        } elseif (!str_contains(strtoupper($sql), 'FOR UPDATE')) {
+        if (!str_contains(strtoupper($sql), 'FOR UPDATE')) {
             $sql = rtrim($sql, ';') . ' FOR UPDATE';
         }
         return $this->fetch($sql, $params);
@@ -425,10 +293,7 @@ class Database
      */
     public function selectAllForUpdate(string $sql, array $params = []): array
     {
-        $driver = $this->config['driver'] ?? 'mysql';
-        if ($driver === 'sqlite') {
-            $sql = preg_replace('/\s+FOR\s+UPDATE\s*$/i', '', $sql);
-        } elseif (!str_contains(strtoupper($sql), 'FOR UPDATE')) {
+        if (!str_contains(strtoupper($sql), 'FOR UPDATE')) {
             $sql = rtrim($sql, ';') . ' FOR UPDATE';
         }
         return $this->fetchAll($sql, $params);

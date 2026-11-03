@@ -255,12 +255,16 @@ abstract class Model implements JsonSerializable
         $qTable = $db->quoteIdentifier($table);
         $quotedCols = array_map([$db, 'quoteIdentifier'], $cols);
 
-        $sql = "INSERT INTO {$qTable} (" . implode(', ', $quotedCols) . ") VALUES (" . implode(', ', $placeholders) . ")";
-        $db->execute($sql, array_values($filtered));
-
-        $insertId = $db->lastInsertId();
-        if ($insertId > 0 && !isset($this->attributes[$pk])) {
-            $this->attributes[$pk] = $insertId;
+        $qPk = $db->quoteIdentifier($pk);
+        if (!isset($this->attributes[$pk])) {
+            $sql = "INSERT INTO {$qTable} (" . implode(', ', $quotedCols) . ") VALUES (" . implode(', ', $placeholders) . ") RETURNING {$qPk}";
+            $insertId = $db->fetchColumn($sql, array_values($filtered));
+            if ($insertId !== null && $insertId !== false) {
+                $this->attributes[$pk] = is_numeric($insertId) ? (int) $insertId : $insertId;
+            }
+        } else {
+            $sql = "INSERT INTO {$qTable} (" . implode(', ', $quotedCols) . ") VALUES (" . implode(', ', $placeholders) . ")";
+            $db->execute($sql, array_values($filtered));
         }
 
         $this->exists = true;

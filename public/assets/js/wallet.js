@@ -213,25 +213,10 @@
             }, 800);
             return true;
           } else {
-            // If backend is mock / standalone demo mode
-            if (verifyData.mock) {
-              if (window.showToast) window.showToast('Demo login successful!', 'success');
-              setTimeout(() => { window.location.href = '/dashboard.php'; }, 800);
-              return true;
-            }
-            throw new Error(verifyData.error || 'Signature verification failed on server');
+            throw new Error(verifyData.error || verifyData.message || 'Signature verification failed on server');
           }
         } catch (postErr) {
-          // If server endpoints are not yet deployed or standalone dev
-          console.log('Server verify warning:', postErr);
-          // Store wallet in sessionStorage as authenticated demo
-          sessionStorage.setItem('undo_wallet_connected', 'true');
-          sessionStorage.setItem('undo_wallet_address', pubKeyStr);
-          if (window.showToast) window.showToast('Wallet authenticated successfully!', 'success');
-          setTimeout(() => {
-            window.location.href = '/dashboard.php';
-          }, 800);
-          return true;
+          throw new Error(postErr.message || 'Server signature verification failed');
         }
 
       } catch (err) {
@@ -254,8 +239,6 @@
       this.connected = false;
       this.publicKey = null;
       this.activeWalletName = null;
-      sessionStorage.removeItem('undo_wallet_connected');
-      sessionStorage.removeItem('undo_wallet_address');
     }
   };
 

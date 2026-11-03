@@ -268,13 +268,10 @@ unset($_SESSION['flash_error'], $_SESSION['flash_success']);
           if (data.success) {
             window.location.href = '/dashboard.php';
           } else {
-            showToast(data.error || 'Authentication failed', 'error');
+            showToast(data.message || data.error || 'Authentication failed. Please check your credentials.', 'error');
           }
         } catch (err) {
-          // Mock login for offline / frontend demo
-          console.log('Backend not answering, proceeding to dashboard with mock session');
-          sessionStorage.setItem('undo_user_logged', 'true');
-          window.location.href = '/dashboard.php';
+          showToast(err.message || 'Network error connecting to authentication service.', 'error');
         } finally {
           if (spinner) spinner.classList.add('hidden');
           if (btnText) btnText.textContent = 'Sign In';

@@ -98,15 +98,7 @@ class UserBalance extends Model
         }
 
         $db = static::getDb();
-        $driver = method_exists($db, 'getDriver') ? $db->getDriver() : 'mysql';
-
-        if ($driver === 'sqlite') {
-            $sql = "INSERT OR IGNORE INTO user_balances (user_id, token, available, escrow) VALUES (?, ?, 0.00000000, 0.00000000)";
-        } elseif ($driver === 'pgsql') {
-            $sql = "INSERT INTO user_balances (user_id, token, available, escrow) VALUES (?, ?, 0.00000000, 0.00000000) ON CONFLICT (user_id, token) DO NOTHING";
-        } else {
-            $sql = "INSERT IGNORE INTO user_balances (user_id, token, available, escrow) VALUES (?, ?, 0.00000000, 0.00000000)";
-        }
+        $sql = "INSERT INTO user_balances (user_id, token, available, escrow) VALUES (?, ?, 0.00000000, 0.00000000) ON CONFLICT (user_id, token) DO NOTHING";
 
         try {
             $db->execute($sql, [$userId, $token]);

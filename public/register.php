@@ -239,13 +239,10 @@ unset($_SESSION['flash_error'], $_SESSION['flash_success']);
             showToast('Account successfully created! Redirecting...', 'success');
             setTimeout(() => { window.location.href = '/dashboard.php'; }, 800);
           } else {
-            showToast(data.error || 'Registration failed', 'error');
+            showToast(data.message || data.error || 'Registration failed.', 'error');
           }
         } catch (err) {
-          // Demo fallback
-          showToast('Account created (Demo Mode)! Redirecting...', 'success');
-          sessionStorage.setItem('undo_user_logged', 'true');
-          setTimeout(() => { window.location.href = '/dashboard.php'; }, 800);
+          showToast(err.message || 'Network error during registration.', 'error');
         } finally {
           if (spinner) spinner.classList.add('hidden');
           if (btnText) btnText.textContent = 'Create Account';
