@@ -120,8 +120,15 @@ class Database
                 $this->pdo->exec("SET NAMES 'UTF8';");
             }
         } catch (PDOException $e) {
-            // If MySQL is unreachable in local environment, fall back to SQLite
-            if ($driver === 'mysql' && (str_contains($e->getMessage(), '2002') || str_contains($e->getMessage(), 'refused'))) {
+            // If MySQL or PgSQL (Supabase) is unreachable or driver is missing in local environment, fall back to SQLite
+            $errMsg = strtolower($e->getMessage());
+            $isLocalFallback = str_contains($errMsg, '2002')
+                || str_contains($errMsg, 'refused')
+                || str_contains($errMsg, 'could not find driver')
+                || str_contains($errMsg, 'getaddrinfo')
+                || str_contains($errMsg, 'timeout');
+
+            if ($isLocalFallback) {
                 $sqlitePath = dirname(__DIR__, 2) . '/database/undo_transfers.sqlite';
                 $this->config['driver'] = 'sqlite';
                 $this->config['database'] = $sqlitePath;
