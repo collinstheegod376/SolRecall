@@ -28,8 +28,8 @@ foreach ($users as $u) {
 
     if (!empty($addr)) {
         try {
-            $lamports = $rpc->getBalance($addr);
-            $sol = $lamports / 1_000_000_000;
+            $sol = $rpc->getBalance($addr);
+            $lamports = (int) round($sol * 1_000_000_000);
             echo "On-Chain Solana Devnet Balance: {$sol} SOL ({$lamports} lamports)\n";
         } catch (\Throwable $e) {
             echo "Error checking on-chain balance: " . $e->getMessage() . "\n";
