@@ -38,6 +38,13 @@
     }
   };
 
+  // Supported Token Logos Map
+  const tokenLogos = {
+    SOL: { url: 'https://cryptologos.cc/logos/solana-sol-logo.png', local: '/assets/img/sol.png' },
+    USDC: { url: 'https://cryptologos.cc/logos/usd-coin-usdc-logo.png', local: '/assets/img/usdc.png' },
+    USDT: { url: 'https://cryptologos.cc/logos/tether-usdt-logo.png', local: '/assets/img/usdt.png' }
+  };
+
   // Toast Notification System
   function showToast(message, type = 'info', duration = 3500) {
     let container = document.getElementById('toast-container');
@@ -497,12 +504,6 @@
     }
 
     if (emptyState) emptyState.classList.add('hidden');
-
-    const tokenLogos = {
-      SOL: { url: 'https://cryptologos.cc/logos/solana-sol-logo.png', local: '/assets/img/sol.png' },
-      USDC: { url: 'https://cryptologos.cc/logos/usd-coin-usdc-logo.png', local: '/assets/img/usdc.png' },
-      USDT: { url: 'https://cryptologos.cc/logos/tether-usdt-logo.png', local: '/assets/img/usdt.png' }
-    };
 
     const html = AppState.pendingTransfers.map(t => {
       const remaining = calculateRemainingSeconds(t);
@@ -1475,13 +1476,14 @@
   }
 
   function switchTab(tabId) {
+    if (!tabId) return;
     // Hide all tab sections
     document.querySelectorAll('.dashboard-tab-content').forEach(section => {
       section.classList.add('hidden');
     });
 
     // Show target section
-    const targetSection = document.getElementById(`tab-content-${tabId}`);
+    const targetSection = document.getElementById('tab-content-' + tabId);
     if (targetSection) targetSection.classList.remove('hidden');
 
     // Update navigation active styles
@@ -1506,6 +1508,13 @@
       }
     });
 
+    // Trigger subview renderers when opening tab
+    if (tabId === 'history') {
+      try { renderHistoryTable(); } catch (e) { console.error('History tab render error:', e); }
+    } else if (tabId === 'settings') {
+      try { setupSettings(); } catch (e) { console.error('Settings tab setup error:', e); }
+    }
+
     // Scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -1527,6 +1536,9 @@
 
   // App Initialization
   async function init() {
+    // 1. Setup tabs immediately so buttons are responsive right away
+    try { setupTabs(); } catch (e) { console.error('setupTabs error:', e); }
+
     // Load live user & balances from Supabase API
     try {
       const authRes = await apiFetch('/api/auth/me');
@@ -1537,7 +1549,11 @@
           AppState.user.solana_deposit_address = payload.deposit_address;
         }
       }
+    } catch (e) {
+      console.warn('Initial auth fetch notice:', e.message);
+    }
 
+    try {
       const balRes = await apiFetch('/api/transfers/balances');
       if (balRes && balRes.success) {
         const payload = balRes.data || balRes;
@@ -1545,7 +1561,11 @@
         if (payload.thresholds) AppState.thresholds = payload.thresholds;
         if (payload.settings) AppState.settings = payload.settings;
       }
+    } catch (e) {
+      console.warn('Initial balances fetch notice:', e.message);
+    }
 
+    try {
       const pendRes = await apiFetch('/api/transfers/pending');
       if (pendRes && pendRes.success) {
         const payload = pendRes.data || pendRes;
@@ -1554,7 +1574,11 @@
           AppState.pendingTransfers = list;
         }
       }
+    } catch (e) {
+      console.warn('Initial pending fetch notice:', e.message);
+    }
 
+    try {
       const histRes = await apiFetch('/api/transfers/history');
       if (histRes && histRes.success) {
         const payload = histRes.data || histRes;
@@ -1564,17 +1588,16 @@
         }
       }
     } catch (e) {
-      console.warn('Initial data load notice:', e.message);
+      console.warn('Initial history fetch notice:', e.message);
     }
 
-    renderHeaderAndBalances();
-    renderPendingTransfers();
-    renderHistoryTable();
-    setupTransferForm();
-    setupHistoryListeners();
-    setupSettings();
-    setupTabs();
-    startTicker();
+    try { renderHeaderAndBalances(); } catch (e) { console.error('Error rendering balances:', e); }
+    try { renderPendingTransfers(); } catch (e) { console.error('Error rendering pending:', e); }
+    try { renderHistoryTable(); } catch (e) { console.error('Error rendering history:', e); }
+    try { setupTransferForm(); } catch (e) { console.error('Error setting up transfer form:', e); }
+    try { setupHistoryListeners(); } catch (e) { console.error('Error setting up history listeners:', e); }
+    try { setupSettings(); } catch (e) { console.error('Error setting up settings:', e); }
+    try { startTicker(); } catch (e) { console.error('Error starting ticker:', e); }
   }
 
   // DOM Ready
