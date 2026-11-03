@@ -493,6 +493,11 @@ class AuthService
         $sessionId = session_id();
         $userId = (int) $user->id;
         $_SESSION['user_id'] = $userId;
+        $_SESSION['username'] = (string) $user->username;
+        $_SESSION['email'] = (string) $user->email;
+        $_SESSION['solana_deposit_address'] = (string) $user->solana_deposit_address;
+        $_SESSION['is_admin'] = (int) $user->is_admin;
+        $_SESSION['two_factor_enabled'] = (int) $user->two_factor_enabled;
         $_SESSION['logged_in_at'] = time();
 
         // Store session record in DB

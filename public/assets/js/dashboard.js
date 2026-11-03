@@ -77,30 +77,151 @@
   }
   window.showToast = showToast;
 
-  // Copy to Clipboard Helper
-  function copyToClipboard(text, label = 'Address') {
+  // Copy to Clipboard Helper (Supports Secure Context, Textarea Fallback, and Prompt)
+  async function copyToClipboard(text, label = 'Address') {
+    if (!text || typeof text !== 'string' || !text.trim()) {
+      showToast('No address available to copy', 'warning');
+      return false;
+    }
+    const cleanText = text.trim();
+
+    // 1. Try modern Clipboard API if supported
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(() => {
+      try {
+        await navigator.clipboard.writeText(cleanText);
         showToast(`${label} copied to clipboard!`, 'success');
-      }).catch(() => fallbackCopy(text, label));
-    } else {
-      fallbackCopy(text, label);
+        return true;
+      } catch (err) {
+        // Fall back to DOM execCommand
+      }
     }
-  }
-  function fallbackCopy(text, label) {
-    const input = document.createElement('input');
-    input.value = text;
-    document.body.appendChild(input);
-    input.select();
+
+    // 2. High-reliability textarea fallback
     try {
-      document.execCommand('copy');
-      showToast(`${label} copied to clipboard!`, 'success');
+      const ta = document.createElement('textarea');
+      ta.value = cleanText;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.top = '0';
+      ta.style.left = '0';
+      ta.style.width = '2em';
+      ta.style.height = '2em';
+      ta.style.padding = '0';
+      ta.style.border = 'none';
+      ta.style.outline = 'none';
+      ta.style.boxShadow = 'none';
+      ta.style.background = 'transparent';
+      ta.style.zIndex = '999999';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      ta.setSelectionRange(0, cleanText.length);
+
+      const successful = document.execCommand('copy');
+      document.body.removeChild(ta);
+
+      if (successful) {
+        showToast(`${label} copied to clipboard!`, 'success');
+        return true;
+      }
     } catch (e) {
-      showToast('Could not copy to clipboard', 'error');
+      console.warn('DOM copy failed:', e);
     }
-    document.body.removeChild(input);
+
+    // 3. Fallback prompt
+    window.prompt(`Copy ${label}:`, cleanText);
+    return true;
   }
   window.copyToClipboard = copyToClipboard;
+
+  // Render / Refresh Deposit Modal & QR Code
+  function renderDepositModal() {
+    const addr = (AppState.user && AppState.user.solana_deposit_address)
+      || document.getElementById('userDepositAddressFull')?.textContent?.trim()
+      || document.getElementById('userDepositAddress')?.dataset?.full
+      || '';
+
+    if (!addr || addr.length < 32) return;
+
+    // 1. Update text displays
+    const fullEl = document.getElementById('userDepositAddressFull');
+    if (fullEl) fullEl.textContent = addr;
+
+    const shortEl = document.getElementById('userDepositAddress');
+    if (shortEl) {
+      shortEl.textContent = truncateAddress(addr, 6, 6);
+      shortEl.dataset.full = addr;
+    }
+
+    // 2. Client-side QR generation via QRCode library if available
+    const qrCanvas = document.getElementById('depositQrCanvas');
+    const qrImg = document.getElementById('depositQrCodeImg');
+
+    if (typeof QRCode !== 'undefined' && qrCanvas) {
+      try {
+        qrCanvas.innerHTML = '';
+        qrCanvas.classList.remove('hidden');
+        if (qrImg) qrImg.classList.add('hidden');
+        new QRCode(qrCanvas, {
+          text: addr,
+          width: 160,
+          height: 160,
+          colorDark: '#000000',
+          colorLight: '#ffffff',
+          correctLevel: QRCode.CorrectLevel.M
+        });
+        return;
+      } catch (err) {
+        console.warn('Canvas QR failed, falling back to image QR:', err);
+      }
+    }
+
+    // 3. Fallback to image QR (api.qrserver.com with quickchart.io fallback)
+    if (qrImg) {
+      if (qrCanvas) qrCanvas.classList.add('hidden');
+      qrImg.classList.remove('hidden');
+      const primaryUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=4&data=${encodeURIComponent(addr)}`;
+      const fallbackUrl = `https://quickchart.io/qr?size=180&text=${encodeURIComponent(addr)}`;
+      qrImg.onerror = function () {
+        if (this.src !== fallbackUrl) {
+          this.src = fallbackUrl;
+        }
+      };
+      qrImg.src = primaryUrl;
+    }
+  }
+  window.renderDepositModal = renderDepositModal;
+
+  // Dedicated Deposit Address Copy Action
+  async function copyDepositAddress() {
+    const addr = (AppState.user && AppState.user.solana_deposit_address)
+      || document.getElementById('userDepositAddressFull')?.textContent?.trim()
+      || document.getElementById('userDepositAddress')?.dataset?.full
+      || '';
+
+    if (!addr || addr.length < 32) {
+      showToast('Deposit address not loaded yet. Please wait...', 'warning');
+      return;
+    }
+
+    const copied = await copyToClipboard(addr, 'Deposit address');
+    if (copied) {
+      const btnText = document.getElementById('copyDepositBtnText');
+      const btn = document.getElementById('copyDepositAddressBtn');
+      if (btnText && btn) {
+        const origText = btnText.textContent;
+        btnText.textContent = 'Copied to Clipboard!';
+        btn.classList.add('bg-emerald-600');
+        btn.classList.remove('bg-purple-600');
+        setTimeout(() => {
+          btnText.textContent = origText;
+          btn.classList.remove('bg-emerald-600');
+          btn.classList.add('bg-purple-600');
+        }, 2000);
+      }
+    }
+  }
+  window.copyDepositAddress = copyDepositAddress;
 
   // Truncate Solana Address
   function truncateAddress(addr, front = 4, back = 4) {
@@ -477,11 +598,20 @@
   function renderHeaderAndBalances() {
     const user = AppState.user;
     if (user) {
-      const depositEl = document.getElementById('userDepositAddress');
-      if (depositEl) depositEl.textContent = truncateAddress(user.solana_deposit_address, 6, 6);
+      if (user.solana_deposit_address) {
+        const depositEl = document.getElementById('userDepositAddress');
+        if (depositEl) {
+          depositEl.textContent = truncateAddress(user.solana_deposit_address, 6, 6);
+          depositEl.dataset.full = user.solana_deposit_address;
+        }
 
-      const fullDepositEl = document.getElementById('userDepositAddressFull');
-      if (fullDepositEl) fullDepositEl.textContent = user.solana_deposit_address;
+        const fullDepositEl = document.getElementById('userDepositAddressFull');
+        if (fullDepositEl) fullDepositEl.textContent = user.solana_deposit_address;
+
+        if (typeof renderDepositModal === 'function') {
+          renderDepositModal();
+        }
+      }
 
       const usernameEl = document.getElementById('headerUsername');
       if (usernameEl) usernameEl.textContent = user.username || user.email || 'Solana User';
@@ -1214,11 +1344,14 @@
     modal.classList.remove('hidden');
 
     // Fetch new secret & QR
-    apiFetch('/api/auth/2fa/generate').then(data => {
+    apiFetch('/api/auth/2fa/generate').then(res => {
+      const payload = res.data || res;
       const qrImg = document.getElementById('twoFaQrImage');
       const secretText = document.getElementById('twoFaSecretText');
-      if (qrImg && data.qr_code_url) qrImg.src = data.qr_code_url;
-      if (secretText && data.secret) secretText.textContent = data.secret;
+      if (qrImg && payload.qr_code_url) qrImg.src = payload.qr_code_url;
+      if (secretText && payload.secret) secretText.textContent = payload.secret;
+    }).catch(err => {
+      console.warn('2FA generate notice:', err.message);
     });
   }
   window.open2FaModal = open2FaModal;
@@ -1398,6 +1531,9 @@
       if (authRes && authRes.success) {
         const payload = authRes.data || authRes;
         AppState.user = payload.user || payload;
+        if (payload.deposit_address && !AppState.user.solana_deposit_address) {
+          AppState.user.solana_deposit_address = payload.deposit_address;
+        }
       }
 
       const balRes = await apiFetch('/api/transfers/balances');

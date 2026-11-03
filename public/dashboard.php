@@ -10,6 +10,24 @@ if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
 }
 
 $userId = (int) $_SESSION['user_id'];
+
+// Guarantee user details and custodial deposit address are loaded from DB
+require_once __DIR__ . '/../app/bootstrap.php';
+if (empty($_SESSION['solana_deposit_address']) || empty($_SESSION['username'])) {
+    try {
+        $userModel = \App\Models\User::find($userId);
+        if ($userModel) {
+            $_SESSION['username'] = (string) $userModel->username;
+            $_SESSION['email'] = (string) $userModel->email;
+            $_SESSION['solana_deposit_address'] = (string) $userModel->solana_deposit_address;
+            $_SESSION['is_admin'] = (int) $userModel->is_admin;
+            $_SESSION['two_factor_enabled'] = (int) $userModel->two_factor_enabled;
+        }
+    } catch (\Throwable $e) {
+        // Fall back gracefully
+    }
+}
+
 $username = htmlspecialchars((string) ($_SESSION['username'] ?? 'User'), ENT_QUOTES, 'UTF-8');
 $userEmail = htmlspecialchars((string) ($_SESSION['email'] ?? ''), ENT_QUOTES, 'UTF-8');
 $depositAddress = htmlspecialchars((string) ($_SESSION['solana_deposit_address'] ?? ''), ENT_QUOTES, 'UTF-8');
@@ -22,6 +40,8 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard • Undo Window for Solana Transfers</title>
   <link rel="icon" type="image/jpeg" href="/logo.jpg">
+  <!-- Client-side QRCode Generator (Offline / Ad-blocker proof) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <!-- Google Fonts: Inter (UI), JetBrains Mono (Addresses/Code), Space Grotesk (Wordmark) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -842,25 +862,27 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
         <button type="button" onclick="closeDepositModal()" class="text-slate-400 hover:text-white text-xs">✕</button>
       </div>
 
-      <div class="bg-white p-3 rounded-2xl mx-auto inline-block shadow-md">
+      <div class="bg-white p-3 rounded-2xl mx-auto inline-block shadow-md min-w-[184px] min-h-[184px] flex items-center justify-center">
+        <div id="depositQrCanvas" class="flex items-center justify-center"></div>
         <img id="depositQrCodeImg"
-             src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=<?= urlencode($depositAddress) ?>"
+             src="<?= !empty($depositAddress) ? 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' . urlencode($depositAddress) : '' ?>"
              alt="Deposit QR Code"
-             class="w-40 h-40">
+             class="<?= empty($depositAddress) ? 'hidden ' : '' ?>w-40 h-40 object-contain mx-auto">
       </div>
 
       <div class="text-left bg-slate-900 p-3 rounded-xl border border-white/5 space-y-1">
         <div class="text-[10px] uppercase font-bold text-slate-400">Solana Deposit Address</div>
-        <div id="userDepositAddressFull" class="text-xs font-mono text-purple-300 break-all select-all leading-relaxed">
+        <div id="userDepositAddressFull" class="text-xs font-mono text-purple-300 break-all select-all leading-relaxed font-semibold">
           <?= htmlspecialchars($depositAddress) ?>
         </div>
       </div>
 
       <button type="button"
-              onclick="copyToClipboard('<?= htmlspecialchars($depositAddress) ?>', 'Deposit address')"
-              class="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-xs font-bold text-white transition flex items-center justify-center gap-1.5 shadow-lg shadow-purple-600/20">
+              id="copyDepositAddressBtn"
+              onclick="copyDepositAddress()"
+              class="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-xs font-bold text-white transition flex items-center justify-center gap-1.5 shadow-lg shadow-purple-600/20 active:scale-95">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"/></svg>
-        Copy Deposit Address
+        <span id="copyDepositBtnText">Copy Deposit Address</span>
       </button>
 
       <p class="text-[11px] text-slate-400 leading-tight">
@@ -986,7 +1008,12 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
 
     function openDepositModal() {
       const modal = document.getElementById('depositModal');
-      if (modal) modal.classList.remove('hidden');
+      if (modal) {
+        modal.classList.remove('hidden');
+        if (typeof window.renderDepositModal === 'function') {
+          window.renderDepositModal();
+        }
+      }
     }
 
     function closeDepositModal() {
