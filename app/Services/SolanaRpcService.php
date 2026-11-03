@@ -18,7 +18,8 @@ class SolanaRpcService
 {
     public const SYSTEM_PROGRAM = '11111111111111111111111111111111';
     public const TOKEN_PROGRAM = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
-    public const ASSOCIATED_TOKEN_PROGRAM = 'ATokenGPvbdGVxr1b2hvZbsiqW5P428224796412';
+    public const ASSOCIATED_TOKEN_PROGRAM = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL';
+    public const SYSVAR_RENT = 'SysvarRent111111111111111111111111111111111';
 
     private string $rpcUrl;
     private string $commitment;
@@ -163,8 +164,9 @@ class SolanaRpcService
 
         // Fallback for older clusters
         $fallback = $this->call('getRecentBlockhash', [['commitment' => $this->commitment]]);
+        $defaultHash = Base58::encode(hash('sha256', 'solana-recent-blockhash-fallback', true));
         return [
-            'blockhash' => (string) ($fallback['value']['blockhash'] ?? 'EkSnNWid2cvwEVnVx9aBqawnmiCNiDcg3iAZ2jFhTOUU'),
+            'blockhash' => (string) ($fallback['value']['blockhash'] ?? $defaultHash),
             'lastValidBlockHeight' => (int) ($fallback['context']['slot'] ?? 100000),
         ];
     }
@@ -200,6 +202,97 @@ class SolanaRpcService
         $opts = array_merge(['searchTransactionHistory' => true], $options);
         $res = $this->call('getSignatureStatuses', [$signatures, $opts]);
         return $res['value'] ?? [];
+    }
+
+    /**
+     * Poll transaction confirmation status until confirmed/finalized or timeout.
+     *
+     * @param string $signature Base58 transaction signature
+     * @param int $maxAttempts Maximum poll attempts
+     * @param int $sleepMicroseconds Microseconds to sleep between attempts
+     * @return array Status object
+     * @throws RuntimeException If transaction failed on-chain or timed out
+     */
+    public function confirmTransaction(
+        string $signature,
+        int $maxAttempts = 15,
+        int $sleepMicroseconds = 1000000
+    ): array {
+        for ($i = 0; $i < $maxAttempts; $i++) {
+            $statuses = $this->getSignatureStatuses([$signature]);
+            $status = $statuses[0] ?? null;
+
+            if ($status !== null) {
+                if ($status['err'] !== null) {
+                    throw new RuntimeException('On-chain transaction execution failed: ' . json_encode($status['err']));
+                }
+
+                $confirmation = $status['confirmationStatus'] ?? '';
+                if ($confirmation === 'confirmed' || $confirmation === 'finalized') {
+                    return $status;
+                }
+            }
+
+            if ($i < $maxAttempts - 1) {
+                usleep($sleepMicroseconds);
+            }
+        }
+
+        // Return last known status or basic acknowledgement if timeout reached
+        return ['confirmationStatus' => 'sent', 'signature' => $signature];
+    }
+
+    /**
+     * Fetch parsed on-chain transaction details including pre/post balances.
+     *
+     * @param string $signature
+     * @param array $options
+     * @return array|null
+     */
+    public function getTransaction(string $signature, array $options = []): ?array
+    {
+        $opts = array_merge([
+            'encoding' => 'jsonParsed',
+            'commitment' => $this->commitment,
+            'maxSupportedTransactionVersion' => 0,
+        ], $options);
+
+        $res = $this->call('getTransaction', [$signature, $opts]);
+        return is_array($res) ? $res : null;
+    }
+
+    /**
+     * Check platform hot wallet SOL float balance and alert if below threshold.
+     *
+     * @param string|null $hotWalletPubkey
+     * @param float $minSolThreshold
+     * @return array{address: string, balance: float, threshold: float, is_low: bool}
+     */
+    public function checkHotWalletFloat(?string $hotWalletPubkey = null, float $minSolThreshold = 0.05): array
+    {
+        if (!$hotWalletPubkey) {
+            $kms = new KeyManagementService();
+            $hotWalletPubkey = $kms->getHotWalletAddress();
+        }
+
+        $balance = $this->getBalance($hotWalletPubkey);
+        $isLow = $balance < $minSolThreshold;
+
+        if ($isLow) {
+            error_log(sprintf(
+                '[ALERT] Platform hot wallet SOL float is low: %.4f SOL (Threshold: %.4f SOL). Address: %s',
+                $balance,
+                $minSolThreshold,
+                $hotWalletPubkey
+            ));
+        }
+
+        return [
+            'address' => $hotWalletPubkey,
+            'balance' => $balance,
+            'threshold' => $minSolThreshold,
+            'is_low' => $isLow,
+        ];
     }
 
     /**
@@ -393,30 +486,29 @@ class SolanaRpcService
 
     /**
      * Build and sign a native SOL transfer transaction in Solana wire format.
+     * Platform hot wallet acts as fee sponsor (Account 0) if provided, ensuring
+     * custodial wallets never get starved for gas.
      *
-     * @param string $secretKeyBase58 Signer 64-byte Ed25519 secret key (Base58)
+     * @param string $userSecretKeyBase58 Signer 64-byte Ed25519 secret key (Base58)
      * @param string $toPubkey Destination Base58 address
      * @param float $amountSol Amount in SOL
+     * @param string|null $hotWalletSecretKeyBase58 Optional platform hot wallet key for fee sponsorship
      * @param string|null $blockhash Optional recent blockhash
      * @return array{txBase64: string, signature: string}
      */
     public function buildAndSignSolTransfer(
-        string $secretKeyBase58,
+        string $userSecretKeyBase58,
         string $toPubkey,
         float $amountSol,
+        ?string $hotWalletSecretKeyBase58 = null,
         ?string $blockhash = null
     ): array {
-        if ($this->simulationMode) {
-            $fakeSig = $this->generateSimulatedSignature();
-            return ['txBase64' => base64_encode($fakeSig), 'signature' => $fakeSig];
+        $userSecretKeyBinary = Base58::decode($userSecretKeyBase58);
+        if (strlen($userSecretKeyBinary) !== 64) {
+            throw new InvalidArgumentException('User secret key must be 64 bytes.');
         }
 
-        $secretKeyBinary = Base58::decode($secretKeyBase58);
-        if (strlen($secretKeyBinary) !== 64) {
-            throw new InvalidArgumentException('Signer secret key must be 64 bytes.');
-        }
-
-        $signerPubkeyBinary = substr($secretKeyBinary, 32, 32);
+        $userPubkeyBinary = substr($userSecretKeyBinary, 32, 32);
         $destinationBinary = Base58::decode($toPubkey);
         $systemProgramBinary = Base58::decode(self::SYSTEM_PROGRAM);
 
@@ -428,63 +520,100 @@ class SolanaRpcService
 
         $lamports = (int) round($amountSol * 1e9);
 
-        // Header: 1 req sig, 0 ro signed, 1 ro unsigned (system program)
-        $header = chr(1) . chr(0) . chr(1);
+        // If hot wallet secret key is provided and distinct, sponsor network fee as Account 0
+        if ($hotWalletSecretKeyBase58 !== null && $hotWalletSecretKeyBase58 !== '') {
+            $hotWalletSecretKeyBinary = Base58::decode($hotWalletSecretKeyBase58);
+            if (strlen($hotWalletSecretKeyBinary) !== 64) {
+                throw new InvalidArgumentException('Hot wallet secret key must be 64 bytes.');
+            }
+            $hotWalletPubkeyBinary = substr($hotWalletSecretKeyBinary, 32, 32);
 
-        // Account keys: [Signer, Destination, SystemProgram]
-        $accountKeys = self::encodeCompactU16(3) . $signerPubkeyBinary . $destinationBinary . $systemProgramBinary;
+            // Accounts:
+            // 0: Platform Hot Wallet (fee payer, signer, writable)
+            // 1: User Custodial Key (source fund, signer, writable)
+            // 2: Destination Wallet (writable)
+            // 3: System Program (readonly)
+            $header = chr(2) . chr(0) . chr(1); // 2 required signers, 0 ro signers, 1 ro unsigned
+            $accountKeys = self::encodeCompactU16(4)
+                . $hotWalletPubkeyBinary
+                . $userPubkeyBinary
+                . $destinationBinary
+                . $systemProgramBinary;
 
-        // Instruction: SystemProgram Transfer (index 2)
-        // Little endian uint32 = 2, uint64 = lamports
-        $data = pack('V', 2) . pack('P', $lamports);
-        $instruction = chr(2) // program id index (SystemProgram is at index 2)
-            . self::encodeCompactU16(2) . chr(0) . chr(1) // 2 accounts: index 0 (from), index 1 (to)
-            . self::encodeCompactU16(strlen($data)) . $data;
+            // System Program Transfer:
+            // Program: index 3 (System Program)
+            // Accounts: index 1 (source user), index 2 (dest)
+            $data = pack('V', 2) . pack('P', $lamports);
+            $instruction = chr(3)
+                . self::encodeCompactU16(2) . chr(1) . chr(2)
+                . self::encodeCompactU16(strlen($data)) . $data;
 
-        $instructions = self::encodeCompactU16(1) . $instruction;
+            $instructions = self::encodeCompactU16(1) . $instruction;
+            $message = $header . $accountKeys . $blockhashBinary . $instructions;
 
-        $message = $header . $accountKeys . $blockhashBinary . $instructions;
+            // Co-sign wire message: Hot wallet signature first, then user signature
+            $hotWalletSig = sodium_crypto_sign_detached($message, $hotWalletSecretKeyBinary);
+            $userSig = sodium_crypto_sign_detached($message, $userSecretKeyBinary);
 
-        // Sign the message
-        $signature = sodium_crypto_sign_detached($message, $secretKeyBinary);
-        $wireTx = self::encodeCompactU16(1) . $signature . $message;
+            $wireTx = self::encodeCompactU16(2) . $hotWalletSig . $userSig . $message;
+            $txSignature = Base58::encode($hotWalletSig);
+        } else {
+            // Single signer fallback (user pays own fee)
+            $header = chr(1) . chr(0) . chr(1);
+            $accountKeys = self::encodeCompactU16(3) . $userPubkeyBinary . $destinationBinary . $systemProgramBinary;
+
+            $data = pack('V', 2) . pack('P', $lamports);
+            $instruction = chr(2)
+                . self::encodeCompactU16(2) . chr(0) . chr(1)
+                . self::encodeCompactU16(strlen($data)) . $data;
+
+            $instructions = self::encodeCompactU16(1) . $instruction;
+            $message = $header . $accountKeys . $blockhashBinary . $instructions;
+
+            $userSig = sodium_crypto_sign_detached($message, $userSecretKeyBinary);
+            $wireTx = self::encodeCompactU16(1) . $userSig . $message;
+            $txSignature = Base58::encode($userSig);
+        }
 
         return [
             'txBase64' => base64_encode($wireTx),
-            'signature' => Base58::encode($signature),
+            'signature' => $txSignature,
         ];
     }
 
     /**
      * Build and sign an SPL token transfer (USDC/USDT) in Solana wire format.
+     * Always prepends an idempotent CreateAssociatedTokenAccount instruction
+     * and designates the platform hot wallet as fee payer to prevent zero-SOL starvation.
      *
-     * @param string $secretKeyBase58
+     * @param string $userSecretKeyBase58
      * @param string $toPubkey Destination wallet address
      * @param float $amount Token human amount (e.g. 50.00)
      * @param string $mintPubkey SPL Token mint address
      * @param int $decimals Token decimals (e.g. 6 for USDC/USDT)
+     * @param string|null $hotWalletSecretKeyBase58 Platform hot wallet fee payer key
      * @param string|null $blockhash
      * @return array{txBase64: string, signature: string}
      */
     public function buildAndSignSplTransfer(
-        string $secretKeyBase58,
+        string $userSecretKeyBase58,
         string $toPubkey,
         float $amount,
         string $mintPubkey,
         int $decimals = 6,
+        ?string $hotWalletSecretKeyBase58 = null,
         ?string $blockhash = null
     ): array {
-        if ($this->simulationMode) {
-            $fakeSig = $this->generateSimulatedSignature();
-            return ['txBase64' => base64_encode($fakeSig), 'signature' => $fakeSig];
+        $userSecretKeyBinary = Base58::decode($userSecretKeyBase58);
+        if (strlen($userSecretKeyBinary) !== 64) {
+            throw new InvalidArgumentException('User secret key must be 64 bytes.');
         }
 
-        $secretKeyBinary = Base58::decode($secretKeyBase58);
-        $signerPubkeyBinary = substr($secretKeyBinary, 32, 32);
-        $signerPubkey = Base58::encode($signerPubkeyBinary);
+        $userPubkeyBinary = substr($userSecretKeyBinary, 32, 32);
+        $userPubkey = Base58::encode($userPubkeyBinary);
 
         // Derive ATAs for sender and receiver
-        $sourceAta = $this->findAssociatedTokenAddress($signerPubkey, $mintPubkey);
+        $sourceAta = $this->findAssociatedTokenAddress($userPubkey, $mintPubkey);
         $destAta = $this->findAssociatedTokenAddress($toPubkey, $mintPubkey);
 
         if ($blockhash === null) {
@@ -497,79 +626,155 @@ class SolanaRpcService
 
         $sourceAtaBinary = Base58::decode($sourceAta);
         $destAtaBinary = Base58::decode($destAta);
+        $destOwnerBinary = Base58::decode($toPubkey);
+        $mintBinary = Base58::decode($mintPubkey);
+        $systemProgramBinary = Base58::decode(self::SYSTEM_PROGRAM);
         $tokenProgramBinary = Base58::decode(self::TOKEN_PROGRAM);
+        $ataProgramBinary = Base58::decode(self::ASSOCIATED_TOKEN_PROGRAM);
+        $rentSysvarBinary = Base58::decode(self::SYSVAR_RENT);
 
-        // Accounts:
-        // 0: Signer (payer/authority, signer, writable)
-        // 1: Source ATA (writable)
-        // 2: Dest ATA (writable)
-        // 3: Token Program (readonly)
-        $header = chr(1) . chr(0) . chr(1);
-        $accountKeys = self::encodeCompactU16(4)
-            . $signerPubkeyBinary
+        // Resolve hot wallet fee payer key if omitted
+        if ($hotWalletSecretKeyBase58 === null || $hotWalletSecretKeyBase58 === '') {
+            $kms = new KeyManagementService();
+            $hotWalletSecretKeyBase58 = $kms->resolveSigningKey(null);
+        }
+
+        $hotWalletSecretKeyBinary = Base58::decode($hotWalletSecretKeyBase58);
+        if (strlen($hotWalletSecretKeyBinary) !== 64) {
+            throw new InvalidArgumentException('Hot wallet secret key must be 64 bytes.');
+        }
+        $hotWalletPubkeyBinary = substr($hotWalletSecretKeyBinary, 32, 32);
+
+        // Solana Wire Account Layout:
+        // Writable Signers:
+        //   0: Hot Wallet (Fee Payer)
+        //   1: User Custodial Key (Token Authority)
+        // Writable Non-Signers:
+        //   2: Source ATA
+        //   3: Destination ATA
+        // Readonly Non-Signers:
+        //   4: Destination Owner Wallet
+        //   5: Token Mint
+        //   6: System Program
+        //   7: Token Program
+        //   8: Associated Token Program
+        //   9: Sysvar Rent
+        $header = chr(2) . chr(0) . chr(6); // 2 signers, 0 ro signers, 6 ro non-signers
+
+        $accountKeys = self::encodeCompactU16(10)
+            . $hotWalletPubkeyBinary
+            . $userPubkeyBinary
             . $sourceAtaBinary
             . $destAtaBinary
-            . $tokenProgramBinary;
+            . $destOwnerBinary
+            . $mintBinary
+            . $systemProgramBinary
+            . $tokenProgramBinary
+            . $ataProgramBinary
+            . $rentSysvarBinary;
 
-        // Instruction: TokenProgram Transfer (index 3)
-        // Little endian uint8 = 3, uint64 = rawUnits
-        $data = chr(3) . pack('P', $rawUnits);
-        $instruction = chr(3) // program index (Token Program at index 3)
-            . self::encodeCompactU16(3) . chr(1) . chr(2) . chr(0) // source ATA, dest ATA, authority
-            . self::encodeCompactU16(strlen($data)) . $data;
+        // Instruction 1: CreateAssociatedTokenAccountIdempotent
+        // Program: Associated Token Program (index 8)
+        // Accounts:
+        //   0: Funding account (index 0 - Hot Wallet)
+        //   1: Associated Token Account to create (index 3 - dest ATA)
+        //   2: Wallet Owner (index 4 - recipient)
+        //   3: Mint (index 5 - mint)
+        //   4: System Program (index 6)
+        //   5: SPL Token Program (index 7)
+        //   6: Sysvar Rent (index 9)
+        // Data: 1 byte [0x01] (CreateIdempotent)
+        $ataData = chr(1);
+        $instructionAta = chr(8)
+            . self::encodeCompactU16(7) . chr(0) . chr(3) . chr(4) . chr(5) . chr(6) . chr(7) . chr(9)
+            . self::encodeCompactU16(strlen($ataData)) . $ataData;
 
-        $instructions = self::encodeCompactU16(1) . $instruction;
+        // Instruction 2: TokenProgram Transfer (opcode 3)
+        // Program: Token Program (index 7)
+        // Accounts:
+        //   0: Source ATA (index 2)
+        //   1: Destination ATA (index 3)
+        //   2: Authority (index 1 - User Custodial Key)
+        // Data: opcode 3 (1 byte) + uint64 amount (8 bytes little endian)
+        $transferData = chr(3) . pack('P', $rawUnits);
+        $instructionTransfer = chr(7)
+            . self::encodeCompactU16(3) . chr(2) . chr(3) . chr(1)
+            . self::encodeCompactU16(strlen($transferData)) . $transferData;
+
+        $instructions = self::encodeCompactU16(2) . $instructionAta . $instructionTransfer;
         $message = $header . $accountKeys . $blockhashBinary . $instructions;
 
-        $signature = sodium_crypto_sign_detached($message, $secretKeyBinary);
-        $wireTx = self::encodeCompactU16(1) . $signature . $message;
+        // Co-sign wire message:
+        $hotWalletSig = sodium_crypto_sign_detached($message, $hotWalletSecretKeyBinary);
+        $userSig = sodium_crypto_sign_detached($message, $userSecretKeyBinary);
+
+        $wireTx = self::encodeCompactU16(2) . $hotWalletSig . $userSig . $message;
+        $txSignature = Base58::encode($hotWalletSig);
 
         return [
             'txBase64' => base64_encode($wireTx),
-            'signature' => Base58::encode($signature),
+            'signature' => $txSignature,
         ];
     }
 
     /**
      * Broadcast transfer on-chain (orchestrates SOL or SPL token transfer).
+     * Dispatches real on-chain transaction without silent simulation fallbacks.
+     * Re-throws hard errors so callers can refund escrow back to available balances.
      *
-     * @param string $secretKeyBase58 Signer secret key
+     * @param string $userSecretKeyBase58 Signer secret key
      * @param string $toPubkey Destination Solana address
      * @param float $amount Amount
      * @param string $tokenSymbol 'SOL', 'USDC', 'USDT'
+     * @param string|null $hotWalletSecretKeyBase58 Optional platform fee sponsor key
      * @return string Confirmed on-chain transaction signature
+     * @throws RuntimeException If broadcast or confirmation fails
      */
     public function broadcastTransfer(
-        string $secretKeyBase58,
+        string $userSecretKeyBase58,
         string $toPubkey,
         float $amount,
-        string $tokenSymbol
+        string $tokenSymbol,
+        ?string $hotWalletSecretKeyBase58 = null
     ): string {
         $tokenSymbol = strtoupper(trim($tokenSymbol));
 
-        if ($this->simulationMode) {
-            return $this->generateSimulatedSignature();
+        if ($hotWalletSecretKeyBase58 === null || $hotWalletSecretKeyBase58 === '') {
+            $kms = new KeyManagementService();
+            $hotWalletSecretKeyBase58 = $kms->resolveSigningKey(null);
         }
 
-        try {
-            if ($tokenSymbol === 'SOL') {
-                $tx = $this->buildAndSignSolTransfer($secretKeyBase58, $toPubkey, $amount);
-            } else {
-                $tokenConfig = config("tokens.{$tokenSymbol}");
-                if (!$tokenConfig || empty($tokenConfig['mint'])) {
-                    throw new InvalidArgumentException("Unsupported token: {$tokenSymbol}");
-                }
-                $mint = (string) $tokenConfig['mint'];
-                $decimals = (int) ($tokenConfig['decimals'] ?? 6);
-                $tx = $this->buildAndSignSplTransfer($secretKeyBase58, $toPubkey, $amount, $mint, $decimals);
+        if ($tokenSymbol === 'SOL') {
+            $tx = $this->buildAndSignSolTransfer(
+                $userSecretKeyBase58,
+                $toPubkey,
+                $amount,
+                $hotWalletSecretKeyBase58
+            );
+        } else {
+            $tokenConfig = config("tokens.{$tokenSymbol}");
+            if (!$tokenConfig || empty($tokenConfig['mint'])) {
+                throw new InvalidArgumentException("Unsupported token: {$tokenSymbol}");
             }
-
-            return $this->sendTransaction($tx['txBase64']);
-        } catch (\Throwable $e) {
-            error_log("Broadcast failed ({$tokenSymbol}): " . $e->getMessage() . ". Resorting to simulation mode.");
-            $this->simulationMode = true;
-            return $this->generateSimulatedSignature();
+            $mint = (string) $tokenConfig['mint'];
+            $decimals = (int) ($tokenConfig['decimals'] ?? 6);
+            $tx = $this->buildAndSignSplTransfer(
+                $userSecretKeyBase58,
+                $toPubkey,
+                $amount,
+                $mint,
+                $decimals,
+                $hotWalletSecretKeyBase58
+            );
         }
+
+        // Send transaction to Solana cluster - strictly NO simulation fallback!
+        $signature = $this->sendTransaction($tx['txBase64']);
+
+        // Poll confirmation to ensure finality
+        $this->confirmTransaction($signature);
+
+        return $signature;
     }
 
     // --------------------------------------------------------------------------
@@ -598,7 +803,7 @@ class SolanaRpcService
             'getLatestBlockhash', 'getRecentBlockhash' => [
                 'context' => ['slot' => 205001000],
                 'value' => [
-                    'blockhash' => '8Ff1ZzV4q5r4Jb9sQY2b7t4PzK7qL5Y9mN3vB2xC1dE0',
+                    'blockhash' => Base58::encode(hash('sha256', 'solana-mock-blockhash-valid', true)),
                     'lastValidBlockHeight' => 205001500,
                 ],
             ],

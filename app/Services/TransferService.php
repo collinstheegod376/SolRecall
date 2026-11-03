@@ -240,16 +240,27 @@ class TransferService
 
             $now = date('Y-m-d H:i:s');
 
-            // Move balance: escrow -> available
+            // ATOMIC CAS CLAIM: Atomically transition status from 'pending' to 'cancelled'
+            // Only succeeds if row is STILL 'pending' and expires_at has NOT passed yet.
+            // If the cron processor or another process already claimed/expired it, affected rows will be 0.
+            $affected = $db->execute(
+                "UPDATE pending_transfers 
+                 SET status = 'cancelled', cancelled_at = ? 
+                 WHERE id = ? AND status = 'pending' AND expires_at > ?",
+                [$now, $transferId, $now]
+            );
+
+            if ($affected === 0) {
+                throw new ValidationException(
+                    'Transfer cannot be cancelled. The undo window may have expired or the transfer is already being processed.',
+                    ['transfer_id' => 'Cannot cancel transfer in current state']
+                );
+            }
+
+            // Atomic claim won! Safe to reverse escrow balance back into available
             $db->execute(
                 'UPDATE user_balances SET escrow = escrow - ?, available = available + ? WHERE user_id = ? AND token = ?',
                 [$amount, $amount, (int) $transfer['user_id'], $token]
-            );
-
-            // Update transfer status
-            $db->execute(
-                'UPDATE pending_transfers SET status = "cancelled", cancelled_at = ? WHERE id = ?',
-                [$now, $transferId]
             );
 
             return [

@@ -62,18 +62,10 @@ function sendJson(array $data, int $status = 200): void {
 
 // Root Route: GET /
 if ($path === '/' || $path === '/index.php') {
-    if (isset($_GET['demo']) && $_GET['demo'] === '1') {
-        $_SESSION['user_id'] = 1;
-        $_SESSION['username'] = 'sol_trader_alex';
-        $_SESSION['email'] = 'alex@undo.sol';
-        $_SESSION['is_admin'] = 1;
-        renderView('dashboard.php');
-    }
-
-    if (isset($_SESSION['user_id'])) {
-        renderView('dashboard.php');
+    if (isset($_SESSION['user_id']) && is_numeric($_SESSION['user_id'])) {
+        header('Location: /dashboard.php');
+        exit;
     } else {
-        // Direct to login page or dashboard for demo
         header('Location: /login.php');
         exit;
     }
@@ -81,6 +73,10 @@ if ($path === '/' || $path === '/index.php') {
 
 // Direct Page Routes
 if ($path === '/dashboard' || $path === '/dashboard.php') {
+    if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
+        header('Location: /login.php');
+        exit;
+    }
     renderView('dashboard.php');
 }
 

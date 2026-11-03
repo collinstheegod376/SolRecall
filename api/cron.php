@@ -12,12 +12,16 @@ declare(strict_types=1);
 // Set JSON header immediately
 header('Content-Type: application/json; charset=utf-8');
 
-// 1. Optional security token verification (Vercel provides Authorization: Bearer <CRON_SECRET>)
+// 1. Security token verification (Vercel provides Authorization: Bearer <CRON_SECRET>)
 $cronSecret = $_ENV['CRON_SECRET'] ?? getenv('CRON_SECRET') ?: null;
 if ($cronSecret) {
     $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
     $querySecret = $_GET['secret'] ?? '';
-    if ($authHeader !== 'Bearer ' . $cronSecret && $querySecret !== $cronSecret) {
+    $bearerMatch = preg_match('/Bearer\s+(\S+)/i', $authHeader, $matches) ? $matches[1] : '';
+    $isAuthorized = ($bearerMatch !== '' && hash_equals($cronSecret, $bearerMatch))
+        || ($querySecret !== '' && hash_equals($cronSecret, $querySecret));
+
+    if (!$isAuthorized) {
         http_response_code(401);
         echo json_encode(['success' => false, 'error' => 'Unauthorized cron request']);
         exit;
@@ -74,19 +78,28 @@ try {
         $amount = (float) $transfer['amount'];
         $destination = (string) $transfer['destination'];
 
-        // Mark processing
-        $db->execute("UPDATE pending_transfers SET status = 'processing' WHERE id = ?", [$transferId]);
+        // Concurrency-safe atomic claim: Only succeeds if STILL 'pending' and expires_at has arrived
+        $claimed = $db->execute(
+            "UPDATE pending_transfers SET status = 'processing' WHERE id = ? AND status = 'pending' AND expires_at <= ?",
+            [$transferId, $now]
+        );
+
+        if ($claimed === 0) {
+            continue; // Skipped! User cancelled or another worker claimed it.
+        }
 
         try {
-            // Resolve signing key (decrypted custodial key or platform hot wallet)
-            $signingPrivateKey = $keyService->resolveSigningKey($transfer['encrypted_private_key'] ?? null);
+            // Resolve user signing key and hot wallet fee sponsor key
+            $userSigningKey = $keyService->resolveSigningKey($transfer['encrypted_private_key'] ?? null);
+            $hotWalletKey = $keyService->resolveSigningKey(null);
 
-            // Broadcast on-chain
+            // Broadcast on-chain with fee sponsorship & ATA idempotent creation
             $txSignature = $rpcService->broadcastTransfer(
-                $signingPrivateKey,
+                $userSigningKey,
                 $destination,
                 $amount,
-                $token
+                $token,
+                $hotWalletKey
             );
 
             // Deduct escrow balance

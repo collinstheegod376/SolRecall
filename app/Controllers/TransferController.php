@@ -28,23 +28,17 @@ class TransferController
 
     /**
      * Resolve the active authenticated user ID.
-     * Supports PHP sessions, Authorization Bearer token, X-User-Id header,
-     * and fallback to demo user (ID 1) in local development.
+     * Requires a valid PHP session or verified Bearer token from the sessions table.
+     * Strictly rejects untrusted client headers and never defaults to a mock user.
      */
-    protected function getAuthenticatedUserId(Request $request): int
+    protected function getAuthenticatedUserId(Request $request): ?int
     {
         ensure_session_started();
-        if (!empty($_SESSION['user_id'])) {
+        if (!empty($_SESSION['user_id']) && is_numeric($_SESSION['user_id'])) {
             return (int) $_SESSION['user_id'];
         }
 
-        // Header override for API / programmatic testing
-        $headerUserId = $request->header('x-user-id');
-        if ($headerUserId !== null && is_numeric($headerUserId)) {
-            return (int) $headerUserId;
-        }
-
-        // Bearer token authentication via sessions table
+        // Bearer token authentication via database sessions table
         $authHeader = $request->header('authorization');
         if ($authHeader && preg_match('/Bearer\s+(\S+)/i', $authHeader, $matches)) {
             $token = $matches[1];
@@ -53,16 +47,15 @@ class TransferController
                     'SELECT user_id FROM sessions WHERE id = ? AND expires_at > NOW()',
                     [$token]
                 );
-                if ($sessionRow) {
+                if ($sessionRow && !empty($sessionRow['user_id'])) {
                     return (int) $sessionRow['user_id'];
                 }
             } catch (Throwable) {
-                // Ignore DB error and fallback
+                // Database query error
             }
         }
 
-        // Local dev default user (demo_user)
-        return 1;
+        return null;
     }
 
     /**
@@ -75,6 +68,9 @@ class TransferController
     {
         try {
             $userId = $this->getAuthenticatedUserId($request);
+            if ($userId === null) {
+                return Response::error('Authentication required. Please log in.', 401);
+            }
 
             $token = (string) $request->input('token', '');
             $amount = (float) $request->input('amount', 0.0);
@@ -116,6 +112,10 @@ class TransferController
     {
         try {
             $userId = $this->getAuthenticatedUserId($request);
+            if ($userId === null) {
+                return Response::error('Authentication required. Please log in.', 401);
+            }
+
             $transferId = (int) $request->input('transfer_id', 0);
 
             if ($transferId <= 0) {
@@ -141,6 +141,10 @@ class TransferController
     {
         try {
             $userId = $this->getAuthenticatedUserId($request);
+            if ($userId === null) {
+                return Response::error('Authentication required. Please log in.', 401);
+            }
+
             $isAdmin = (bool) $request->input('admin', false);
 
             $pending = $this->transferService->getPendingTransfers($userId, $isAdmin);
@@ -163,6 +167,10 @@ class TransferController
     {
         try {
             $userId = $this->getAuthenticatedUserId($request);
+            if ($userId === null) {
+                return Response::error('Authentication required. Please log in.', 401);
+            }
+
             $limit = max(1, min(100, (int) $request->input('limit', 50)));
             $offset = max(0, (int) $request->input('offset', 0));
 
@@ -188,6 +196,10 @@ class TransferController
     {
         try {
             $userId = $this->getAuthenticatedUserId($request);
+            if ($userId === null) {
+                return Response::error('Authentication required. Please log in.', 401);
+            }
+
             $balances = $this->transferService->getUserBalances($userId);
             $thresholds = $this->transferService->getThresholds();
 
@@ -210,6 +222,9 @@ class TransferController
     {
         try {
             $userId = $this->getAuthenticatedUserId($request);
+            if ($userId === null) {
+                return Response::error('Authentication required. Please log in.', 401);
+            }
 
             $token = (string) $request->input('token', '');
             $amount = (float) $request->input('amount', 0.0);

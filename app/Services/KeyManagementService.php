@@ -40,7 +40,7 @@ class KeyManagementService
             $key = env('APP_ENCRYPTION_KEY') ?: env('APP_KEY');
         }
         if ($key === null || $key === '') {
-            $key = 'undo-escrow-solana-dev-master-key-32b!';
+            throw new RuntimeException('CRITICAL: APP_ENCRYPTION_KEY or APP_KEY environment variable is required for cryptographic operations.');
         }
 
         // Support Laravel-style base64: prefix
@@ -98,11 +98,7 @@ class KeyManagementService
             $secretKeyBinary = sodium_crypto_sign_secretkey($keypair);
             $publicKeyBinary = sodium_crypto_sign_publickey($keypair);
         } else {
-            // High entropy curve25519/ed25519 fallback
-            $seed = random_bytes(32);
-            $hash = hash('sha512', $seed, true);
-            $secretKeyBinary = substr($hash, 0, 32) . random_bytes(32);
-            $publicKeyBinary = substr($secretKeyBinary, 32, 32);
+            throw new RuntimeException('CRITICAL: ext-sodium is required for Solana Ed25519 keypair derivation.');
         }
 
         $publicKeyBase58 = Base58::encode($publicKeyBinary);

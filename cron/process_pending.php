@@ -79,25 +79,28 @@ try {
         }
 
         // 2. Concurrency-safe lock: Atomically change status from 'pending' to 'processing'
+        // Strictly only claims the row if it is STILL 'pending' and expires_at has passed.
+        $now = date('Y-m-d H:i:s');
         $locked = $db->execute(
-            "UPDATE pending_transfers SET status = 'processing' WHERE id = ? AND status = 'pending'",
-            [$transferId]
+            "UPDATE pending_transfers SET status = 'processing' WHERE id = ? AND status = 'pending' AND expires_at <= ?",
+            [$transferId, $now]
         );
 
         if ($locked === 0) {
-            echo "    [SKIP] Transfer #{$transferId} was already claimed by another concurrent worker.\n";
+            echo "    [SKIP] Transfer #{$transferId} was already cancelled by user or claimed by another worker.\n";
             continue;
         }
 
         $processed++;
 
-        // 3. Resolve signing key (user's custodial key or platform hot wallet)
-        $signingKey = $keyService->resolveSigningKey($transfer['encrypted_private_key'] ?? null);
+        // 3. Resolve user signing key and hot wallet fee sponsor key
+        $userSigningKey = $keyService->resolveSigningKey($transfer['encrypted_private_key'] ?? null);
+        $hotWalletKey = $keyService->resolveSigningKey(null);
 
         try {
-            // 4. Broadcast on-chain transaction via SolanaRpcService
-            echo "    Broadcasting transaction to Solana cluster...\n";
-            $txSignature = $rpcService->broadcastTransfer($signingKey, $destination, $amount, $token);
+            // 4. Broadcast on-chain transaction via SolanaRpcService with fee sponsorship
+            echo "    Broadcasting transaction to Solana cluster (Hot wallet fee sponsored)...\n";
+            $txSignature = $rpcService->broadcastTransfer($userSigningKey, $destination, $amount, $token, $hotWalletKey);
             echo "    [ON-CHAIN SUCCESS] Tx Signature: {$txSignature}\n";
 
             // 5. On success: Atomically deduct escrow in user_balances & mark completed

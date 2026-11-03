@@ -89,17 +89,26 @@ function scanDeposits(Database $db, SolanaRpcService $rpcService, ?int $filterUs
                     continue; // already recorded
                 }
 
-                // In live mode, inspect transaction details or query balance delta
-                // For demonstration, when a new signature appears, parse or query balance
+                // In live mode, query transaction details and parse exact balance deltas
                 $confirmedSlot = is_array($sigInfo) ? ($sigInfo['slot'] ?? null) : null;
                 $err = is_array($sigInfo) ? ($sigInfo['err'] ?? null) : null;
                 if ($err !== null) {
                     continue; // Skip failed on-chain transactions
                 }
 
-                // Default detected deposit payload
-                $token = 'SOL';
-                $amount = 1.0;
+                $txData = $rpcService->getTransaction($txSig);
+                if (!$txData) {
+                    continue;
+                }
+
+                $depositDelta = parseTransactionDepositDelta($txData, $depositAddress);
+                if (!$depositDelta) {
+                    // Transaction was an outgoing send, internal contract call, or non-balance delta
+                    continue;
+                }
+
+                $token = $depositDelta['token'];
+                $amount = $depositDelta['amount'];
 
                 $credited = creditDeposit($db, $userId, $token, $amount, $txSig);
                 if ($credited) {
@@ -115,6 +124,90 @@ function scanDeposits(Database $db, SolanaRpcService $rpcService, ?int $filterUs
     }
 
     return $totalCredited;
+}
+
+/**
+ * Parse actual on-chain balance deltas for a specific deposit address.
+ * Inspects postTokenBalances vs preTokenBalances (USDC/USDT) and
+ * postBalances vs preBalances (native SOL).
+ *
+ * @param array $tx Parsed transaction payload from getTransaction
+ * @param string $depositAddress Target deposit public key
+ * @return array{token: string, amount: float}|null
+ */
+function parseTransactionDepositDelta(array $tx, string $depositAddress): ?array
+{
+    $meta = $tx['meta'] ?? null;
+    if (!$meta || ($meta['err'] ?? null) !== null) {
+        return null;
+    }
+
+    $usdcMint = (string) config('tokens.USDC.mint', '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
+    $usdtMint = (string) config('tokens.USDT.mint', 'EJwZgeZrdCraqiSCdtXYWhWsvQTxZeQXP3ZvGWcvppgw');
+
+    // 1. Check SPL Token Balances (postTokenBalances vs preTokenBalances)
+    if (!empty($meta['postTokenBalances']) && is_array($meta['postTokenBalances'])) {
+        $preMap = [];
+        if (!empty($meta['preTokenBalances']) && is_array($meta['preTokenBalances'])) {
+            foreach ($meta['preTokenBalances'] as $pre) {
+                $idx = $pre['accountIndex'] ?? null;
+                if ($idx !== null) {
+                    $preMap[$idx] = (float) ($pre['uiTokenAmount']['uiAmount'] ?? 0.0);
+                }
+            }
+        }
+
+        foreach ($meta['postTokenBalances'] as $post) {
+            $owner = $post['owner'] ?? '';
+            if ($owner === $depositAddress) {
+                $idx = $post['accountIndex'] ?? null;
+                $preAmount = $preMap[$idx] ?? 0.0;
+                $postAmount = (float) ($post['uiTokenAmount']['uiAmount'] ?? 0.0);
+                $delta = $postAmount - $preAmount;
+
+                if ($delta > 0.000001) {
+                    $mint = $post['mint'] ?? '';
+                    $token = match ($mint) {
+                        $usdcMint => 'USDC',
+                        $usdtMint => 'USDT',
+                        default => null
+                    };
+
+                    if ($token !== null) {
+                        return ['token' => $token, 'amount' => round($delta, 6)];
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Check Native SOL Balances (postBalances vs preBalances)
+    $message = $tx['transaction']['message'] ?? [];
+    $accountKeys = $message['accountKeys'] ?? [];
+    $accountIndex = null;
+
+    foreach ($accountKeys as $idx => $keyInfo) {
+        $pubkey = is_array($keyInfo) ? ($keyInfo['pubkey'] ?? '') : (string) $keyInfo;
+        if ($pubkey === $depositAddress) {
+            $accountIndex = $idx;
+            break;
+        }
+    }
+
+    if ($accountIndex !== null && isset($meta['preBalances'][$accountIndex], $meta['postBalances'][$accountIndex])) {
+        $preLamports = (int) $meta['preBalances'][$accountIndex];
+        $postLamports = (int) $meta['postBalances'][$accountIndex];
+        $deltaLamports = $postLamports - $preLamports;
+
+        if ($deltaLamports > 0) {
+            $deltaSol = round($deltaLamports / 1e9, 9);
+            if ($deltaSol > 0.00001) {
+                return ['token' => 'SOL', 'amount' => $deltaSol];
+            }
+        }
+    }
+
+    return null;
 }
 
 /**

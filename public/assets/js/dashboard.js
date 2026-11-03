@@ -124,26 +124,29 @@
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
 
-  // API Call Helper with Mock Fallback
+  // API Call Helper
   async function apiFetch(endpoint, options = {}) {
-    try {
-      const res = await fetch(endpoint, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          ...(options.headers || {})
-        },
-        ...options
-      });
-      if (res.ok) {
-        return await res.json();
-      }
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.error || `Request failed with status ${res.status}`);
-    } catch (err) {
-      console.warn(`[API] fallback triggered for ${endpoint}:`, err.message);
-      return mockApiHandler(endpoint, options);
+    const res = await fetch(endpoint, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...(options.headers || {})
+      },
+      ...options
+    });
+
+    if (res.status === 401) {
+      window.location.href = '/login.php';
+      throw new Error('Authentication required. Redirecting to login...');
     }
+
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      return data;
+    }
+
+    const errorMsg = data.message || data.error || (data.errors ? Object.values(data.errors).flat().join(', ') : `Request failed with status ${res.status}`);
+    throw new Error(errorMsg);
   }
 
   // Mock Data & Handlers for Instant Local Testing
@@ -563,12 +566,23 @@
     container.innerHTML = html;
   }
 
-  // Calculate remaining seconds for a transfer
+  // Calculate remaining seconds for a transfer with UTC normalization
   function calculateRemainingSeconds(transfer) {
+    if (typeof transfer.seconds_remaining === 'number' && !transfer._expiresMs) {
+      transfer._expiresMs = Date.now() + (transfer.seconds_remaining * 1000);
+    }
+    if (transfer._expiresMs) {
+      return Math.max(0, Math.floor((transfer._expiresMs - Date.now()) / 1000));
+    }
     if (!transfer.expires_at) return 0;
-    const expiresMs = new Date(transfer.expires_at).getTime();
-    const nowMs = Date.now();
-    return Math.max(0, Math.floor((expiresMs - nowMs) / 1000));
+
+    let isoStr = String(transfer.expires_at).trim();
+    if (!isoStr.endsWith('Z') && isoStr.indexOf('+') === -1) {
+      isoStr = isoStr.replace(' ', 'T') + 'Z';
+    }
+    const expiresMs = new Date(isoStr).getTime();
+    if (isNaN(expiresMs)) return 0;
+    return Math.max(0, Math.floor((expiresMs - Date.now()) / 1000));
   }
 
   // Real-time Countdown Ticker (1-second tick)
@@ -612,39 +626,40 @@
     }, 1000);
   }
 
-  // Handle expired transfer automatic broadcast
+  // Handle expired transfer automatic broadcast via server polling
   async function handleExpiredTransfers() {
-    showToast('Undo window expired for one or more transfers. Broadcasting on-chain...', 'info');
+    showToast('Undo window expired. Broadcaster processing on Solana...', 'info');
 
-    // Simulate cron processing
     setTimeout(async () => {
-      const now = new Date();
-      const stillPending = [];
+      try {
+        const [balRes, pendRes, histRes] = await Promise.all([
+          apiFetch('/api/transfers/balances'),
+          apiFetch('/api/transfers/pending'),
+          apiFetch('/api/transfers/history')
+        ]);
 
-      AppState.pendingTransfers.forEach(t => {
-        if (calculateRemainingSeconds(t) <= 0) {
-          // Release from escrow, mark completed
-          if (AppState.balances[t.token]) {
-            AppState.balances[t.token].escrow = Math.max(0, AppState.balances[t.token].escrow - t.amount);
-          }
-          const mockSig = '4v9T' + Math.random().toString(36).substring(2, 12) + 'BroadcastSol' + Date.now().toString(36);
-          AppState.historyTransfers.unshift({
-            ...t,
-            status: 'completed',
-            tx_signature: mockSig,
-            processed_at: now.toISOString()
-          });
-          showToast(`Transfer of ${t.amount} ${t.token} successfully broadcast on Solana!`, 'success');
-        } else {
-          stillPending.push(t);
+        if (balRes && balRes.success) {
+          const payload = balRes.data || balRes;
+          if (payload.balances) AppState.balances = payload.balances;
         }
-      });
 
-      AppState.pendingTransfers = stillPending;
-      renderHeaderAndBalances();
-      renderPendingTransfers();
-      renderHistoryTable();
-    }, 1500);
+        if (pendRes && pendRes.success) {
+          const payload = pendRes.data || pendRes;
+          AppState.pendingTransfers = payload.transfers || payload.pending || [];
+        }
+
+        if (histRes && histRes.success) {
+          const payload = histRes.data || histRes;
+          AppState.historyTransfers = payload.transfers || payload.history || [];
+        }
+
+        renderHeaderAndBalances();
+        renderPendingTransfers();
+        renderHistoryTable();
+      } catch (err) {
+        console.warn('Broadcaster sync notice:', err.message);
+      }
+    }, 2500);
   }
 
   // Dynamic Transfer Form Feedback
@@ -779,7 +794,28 @@
           // Reset form
           form.reset();
           updateNotice();
-          // Update UI
+          // Reload real server state
+          try {
+            const [bRes, pRes, hRes] = await Promise.all([
+              apiFetch('/api/transfers/balances'),
+              apiFetch('/api/transfers/pending'),
+              apiFetch('/api/transfers/history')
+            ]);
+            if (bRes && bRes.success) {
+              const p = bRes.data || bRes;
+              if (p.balances) AppState.balances = p.balances;
+            }
+            if (pRes && pRes.success) {
+              const p = pRes.data || pRes;
+              AppState.pendingTransfers = p.transfers || p.pending || [];
+            }
+            if (hRes && hRes.success) {
+              const p = hRes.data || hRes;
+              AppState.historyTransfers = p.transfers || p.history || [];
+            }
+          } catch (e) {
+            console.warn('Sync notice:', e.message);
+          }
           renderHeaderAndBalances();
           renderPendingTransfers();
           renderHistoryTable();
@@ -856,6 +892,27 @@
       if (res.success) {
         showToast(res.message || 'Transfer cancelled! Funds returned to available balance.', 'success');
         closeCancelModal();
+        try {
+          const [bRes, pRes, hRes] = await Promise.all([
+            apiFetch('/api/transfers/balances'),
+            apiFetch('/api/transfers/pending'),
+            apiFetch('/api/transfers/history')
+          ]);
+          if (bRes && bRes.success) {
+            const p = bRes.data || bRes;
+            if (p.balances) AppState.balances = p.balances;
+          }
+          if (pRes && pRes.success) {
+            const p = pRes.data || pRes;
+            AppState.pendingTransfers = p.transfers || p.pending || [];
+          }
+          if (hRes && hRes.success) {
+            const p = hRes.data || hRes;
+            AppState.historyTransfers = p.transfers || p.history || [];
+          }
+        } catch (e) {
+          console.warn('Sync notice:', e.message);
+        }
         renderHeaderAndBalances();
         renderPendingTransfers();
         renderHistoryTable();
@@ -1144,18 +1201,19 @@
         body: JSON.stringify({ password: pwd, code: totp })
       });
 
-      if (res.success && res.private_key) {
+      const key = (res.data && res.data.private_key) || res.private_key;
+      if (res.success && key) {
         const step1 = document.getElementById('exportKeyStep1');
         const step2 = document.getElementById('exportKeyStep2');
         const keyDisplay = document.getElementById('rawPrivateKeyDisplay');
 
         if (step1) step1.classList.add('hidden');
         if (step2) step2.classList.remove('hidden');
-        if (keyDisplay) keyDisplay.textContent = res.private_key;
+        if (keyDisplay) keyDisplay.textContent = key;
 
         showToast('Private key decrypted. Keep it strictly confidential!', 'warning', 5000);
       } else {
-        showToast(res.error || 'Verification failed. Incorrect credentials.', 'error');
+        showToast(res.message || res.error || 'Verification failed. Incorrect credentials.', 'error');
       }
     } catch (err) {
       showToast(err.message, 'error');
@@ -1238,28 +1296,38 @@
     // Load user & balances from API
     try {
       const authRes = await apiFetch('/api/auth/me');
-      if (authRes.success) {
-        AppState.user = authRes.user;
+      if (authRes && authRes.success) {
+        const payload = authRes.data || authRes;
+        AppState.user = payload.user || payload;
       }
 
       const balRes = await apiFetch('/api/transfers/balances');
-      if (balRes.success) {
-        if (balRes.balances) AppState.balances = balRes.balances;
-        if (balRes.thresholds) AppState.thresholds = balRes.thresholds;
-        if (balRes.settings) AppState.settings = balRes.settings;
+      if (balRes && balRes.success) {
+        const payload = balRes.data || balRes;
+        if (payload.balances) AppState.balances = payload.balances;
+        if (payload.thresholds) AppState.thresholds = payload.thresholds;
+        if (payload.settings) AppState.settings = payload.settings;
       }
 
       const pendRes = await apiFetch('/api/transfers/pending');
-      if (pendRes.success && pendRes.pending && pendRes.pending.length > 0) {
-        AppState.pendingTransfers = pendRes.pending;
+      if (pendRes && pendRes.success) {
+        const payload = pendRes.data || pendRes;
+        const list = payload.transfers || payload.pending || [];
+        if (Array.isArray(list)) {
+          AppState.pendingTransfers = list;
+        }
       }
 
       const histRes = await apiFetch('/api/transfers/history');
-      if (histRes.success && histRes.history && histRes.history.length > 0) {
-        AppState.historyTransfers = histRes.history;
+      if (histRes && histRes.success) {
+        const payload = histRes.data || histRes;
+        const list = payload.transfers || payload.history || [];
+        if (Array.isArray(list)) {
+          AppState.historyTransfers = list;
+        }
       }
     } catch (e) {
-      console.warn('Initial data load warning:', e);
+      console.warn('Initial data load notice:', e.message);
     }
 
     renderHeaderAndBalances();

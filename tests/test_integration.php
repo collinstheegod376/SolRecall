@@ -238,19 +238,29 @@ echo "After 1.5 SOL Deposit - Available: {$balancesAfterDeposit['SOL']['availabl
 assert(abs($balancesAfterDeposit['SOL']['available'] - 2.5) < 0.0001); // 2.0 - 1.0 (cron completed) + 1.5 (deposit) = 2.5 SOL
 echo "[OK] Deposit successfully credited to user balance!\n";
 
-// 9. Test TransferController API Endpoints
-echo "\n--- Testing TransferController HTTP API Endpoints ---\n";
+// 9. Test TransferController API Endpoints & Auth Enforcement
+echo "\n--- Testing TransferController HTTP API Endpoints & Auth Enforcement ---\n";
 $controller = new TransferController($transferService);
 
-// A. /api/transfers/balances
-$req = new Request([], [], ['REQUEST_METHOD' => 'GET', 'HTTP_X_USER_ID' => '1'], [], null);
+// A. Unauthenticated request must return 401
+$_SESSION = [];
+$unauthReq = new Request([], [], ['REQUEST_METHOD' => 'GET', 'HTTP_X_USER_ID' => '1'], [], null);
+$unauthRes = $controller->balances($unauthReq);
+assert($unauthRes->getStatusCode() === 401, 'Unauthenticated request must be rejected with HTTP 401');
+echo "[OK] Auth enforcement: Untrusted X-User-Id header rejected with HTTP 401 Unauthorized.\n";
+
+// B. Authenticated session
+$_SESSION['user_id'] = 1;
+$_SESSION['username'] = 'demo_user';
+
+$req = new Request([], [], ['REQUEST_METHOD' => 'GET'], [], null);
 $resBalances = $controller->balances($req);
 assert($resBalances->getStatusCode() === 200);
 $bodyBalances = json_decode($resBalances->getBody(), true);
 assert($bodyBalances['success'] === true);
 echo "[OK] GET /api/transfers/balances returned HTTP 200 with tokens: " . implode(', ', array_keys($bodyBalances['data']['balances'])) . "\n";
 
-// B. /api/transfers/initiate (POST)
+// C. /api/transfers/initiate (POST)
 $postData = [
     'token' => 'USDC',
     'amount' => 50.0,
@@ -258,7 +268,7 @@ $postData = [
     'note' => 'Controller API test USDC',
     'window_minutes' => 15,
 ];
-$reqPost = new Request([], [], ['REQUEST_METHOD' => 'POST', 'HTTP_X_USER_ID' => '1', 'CONTENT_TYPE' => 'application/json'], [], json_encode($postData));
+$reqPost = new Request([], [], ['REQUEST_METHOD' => 'POST', 'CONTENT_TYPE' => 'application/json'], [], json_encode($postData));
 $resInitiate = $controller->initiate($reqPost);
 assert($resInitiate->getStatusCode() === 200);
 $bodyInitiate = json_decode($resInitiate->getBody(), true);
@@ -266,16 +276,16 @@ assert($bodyInitiate['success'] === true);
 $controllerTransferId = $bodyInitiate['data']['transfer_id'];
 echo "[OK] POST /api/transfers/initiate created transfer #{$controllerTransferId} (Hold window: {$bodyInitiate['data']['window_minutes']}m)\n";
 
-// C. /api/transfers/pending (GET)
+// D. /api/transfers/pending (GET)
 $resPending = $controller->pending($req);
 assert($resPending->getStatusCode() === 200);
 $bodyPending = json_decode($resPending->getBody(), true);
 assert($bodyPending['data']['count'] >= 1);
 echo "[OK] GET /api/transfers/pending returned {$bodyPending['data']['count']} pending item(s)\n";
 
-// D. /api/transfers/cancel (POST)
+// E. /api/transfers/cancel (POST)
 $cancelData = ['transfer_id' => $controllerTransferId];
-$reqCancel = new Request([], [], ['REQUEST_METHOD' => 'POST', 'HTTP_X_USER_ID' => '1', 'CONTENT_TYPE' => 'application/json'], [], json_encode($cancelData));
+$reqCancel = new Request([], [], ['REQUEST_METHOD' => 'POST', 'CONTENT_TYPE' => 'application/json'], [], json_encode($cancelData));
 $resCancel = $controller->cancel($reqCancel);
 assert($resCancel->getStatusCode() === 200);
 $bodyCancel = json_decode($resCancel->getBody(), true);
@@ -283,7 +293,7 @@ assert($bodyCancel['success'] === true);
 assert($bodyCancel['data']['status'] === 'cancelled');
 echo "[OK] POST /api/transfers/cancel cancelled transfer #{$controllerTransferId}\n";
 
-// E. /api/transfers/history (GET)
+// F. /api/transfers/history (GET)
 $resHistory = $controller->history($req);
 assert($resHistory->getStatusCode() === 200);
 $bodyHistory = json_decode($resHistory->getBody(), true);
