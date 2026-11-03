@@ -157,8 +157,8 @@ class TransferService
 
                 // Insert pending transfer record
                 $db->execute(
-                    'INSERT INTO pending_transfers (user_id, token, amount, destination, note, expires_at, status) 
-                     VALUES (?, ?, ?, ?, ?, ?, "pending")',
+                    "INSERT INTO pending_transfers (user_id, token, amount, destination, note, expires_at, status) 
+                     VALUES (?, ?, ?, ?, ?, ?, 'pending')",
                     [$userId, $token, $amount, $destination, $note, $expiresAt]
                 );
 
@@ -312,8 +312,8 @@ class TransferService
 
             // Insert as processing
             $db->execute(
-                'INSERT INTO pending_transfers (user_id, token, amount, destination, note, expires_at, status)
-                 VALUES (?, ?, ?, ?, ?, ?, "processing")',
+                "INSERT INTO pending_transfers (user_id, token, amount, destination, note, expires_at, status)
+                 VALUES (?, ?, ?, ?, ?, ?, 'processing')",
                 [$userId, $token, $amount, $destination, $note, $now]
             );
 
@@ -329,7 +329,7 @@ class TransferService
             $processedAt = date('Y-m-d H:i:s');
 
             $this->db->execute(
-                'UPDATE pending_transfers SET status = "completed", tx_signature = ?, processed_at = ? WHERE id = ?',
+                "UPDATE pending_transfers SET status = 'completed', tx_signature = ?, processed_at = ? WHERE id = ?",
                 [$txSig, $processedAt, $transferId]
             );
 
@@ -353,7 +353,7 @@ class TransferService
                     [$amount, $userId, $token]
                 );
                 $db->execute(
-                    'UPDATE pending_transfers SET status = "failed", failure_reason = ?, processed_at = ? WHERE id = ?',
+                    "UPDATE pending_transfers SET status = 'failed', failure_reason = ?, processed_at = ? WHERE id = ?",
                     [$e->getMessage(), $failedAt, $transferId]
                 );
             });
