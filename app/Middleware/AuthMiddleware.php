@@ -39,7 +39,7 @@ class AuthMiddleware
                 return Response::error('Unauthorized. You must be logged in to access this endpoint.', 401);
             }
 
-            return Response::redirect('/login.php');
+            return Response::redirect('/login');
         }
 
         return $next($request);

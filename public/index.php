@@ -8,10 +8,11 @@ declare(strict_types=1);
  */
 
 // 1. Static file routing for PHP built-in web server (php -S)
-if (php_sapi_name() === 'cli-server') {
+// Only skip execution if NOT running on Vercel and file is not a PHP script
+if (php_sapi_name() === 'cli-server' && empty($_ENV['VERCEL']) && empty($_SERVER['VERCEL']) && empty($_SERVER['NOW_REGION'])) {
     $uriPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
     $filePath = __DIR__ . $uriPath;
-    if ($uriPath !== '/' && file_exists($filePath) && !is_dir($filePath)) {
+    if ($uriPath !== '/' && !str_ends_with($uriPath, '.php') && file_exists($filePath) && !is_dir($filePath)) {
         return false;
     }
 }
@@ -36,6 +37,24 @@ $requestUri = $_SERVER['REQUEST_URI'] ?? '/';
 $path = parse_url($requestUri, PHP_URL_PATH) ?: '/';
 $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
 
+// Static file fallback (guarantees correct MIME type & delivery under Vercel serverless)
+$staticFiles = [
+    '/manifest.json' => 'application/manifest+json; charset=utf-8',
+    '/sw.js' => 'application/javascript; charset=utf-8',
+    '/logo.jpg' => 'image/jpeg',
+    '/favicon.ico' => 'image/png',
+];
+
+if (isset($staticFiles[$path])) {
+    $filePath = __DIR__ . ($path === '/favicon.ico' ? '/assets/img/logo.png' : $path);
+    if (file_exists($filePath)) {
+        header('Content-Type: ' . $staticFiles[$path]);
+        header('Cache-Control: public, max-age=3600');
+        readfile($filePath);
+        exit;
+    }
+}
+
 // Helper to render PHP views
 function renderView(string $fileName): void {
     $filePath = __DIR__ . '/' . ltrim($fileName, '/');
@@ -57,28 +76,32 @@ function sendJson(array $data, int $status = 200): void {
 }
 
 // ------------------------------------------------------------------------------
-// Web Page Routes
+// Web Page Routes (Clean URLs)
 // ------------------------------------------------------------------------------
 
 if ($path === '/' || $path === '/index.php') {
     if (isset($_SESSION['user_id']) && is_numeric($_SESSION['user_id'])) {
-        header('Location: /dashboard.php');
+        header('Location: /dashboard');
         exit;
     } else {
-        header('Location: /login.php');
+        header('Location: /login');
         exit;
     }
 }
 
 if ($path === '/dashboard' || $path === '/dashboard.php') {
     if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
-        header('Location: /login.php');
+        header('Location: /login');
         exit;
     }
     renderView('dashboard.php');
 }
 
 if ($path === '/login' || $path === '/login.php') {
+    if (isset($_SESSION['user_id']) && is_numeric($_SESSION['user_id'])) {
+        header('Location: /dashboard');
+        exit;
+    }
     renderView('login.php');
 }
 
@@ -87,6 +110,10 @@ if ($path === '/two-factor-verify' || $path === '/two-factor-verify.php') {
 }
 
 if ($path === '/register' || $path === '/register.php') {
+    if (isset($_SESSION['user_id']) && is_numeric($_SESSION['user_id'])) {
+        header('Location: /dashboard');
+        exit;
+    }
     renderView('register.php');
 }
 
@@ -96,8 +123,10 @@ if ($path === '/logout') {
         $params = session_get_cookie_params();
         setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
     }
-    session_destroy();
-    header('Location: /login.php');
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_destroy();
+    }
+    header('Location: /login');
     exit;
 }
 
@@ -141,7 +170,7 @@ if (str_starts_with($path, '/api/')) {
                 if (session_status() === PHP_SESSION_ACTIVE) {
                     session_destroy();
                 }
-                header('Location: /login.php');
+                header('Location: /login');
                 exit;
             }
 

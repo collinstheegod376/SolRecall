@@ -9,7 +9,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // If already fully authenticated, redirect directly to dashboard
 if (isset($_SESSION['user_id']) && is_numeric($_SESSION['user_id'])) {
-    header('Location: /dashboard.php');
+    header('Location: /dashboard');
     exit;
 }
 
@@ -20,13 +20,13 @@ if (isset($_GET['action']) && $_GET['action'] === 'cancel') {
         $_SESSION['pending_2fa_token'],
         $_SESSION['pending_2fa_expires']
     );
-    header('Location: /login.php');
+    header('Location: /login');
     exit;
 }
 
 // Enforce mandatory pending 2FA login session check
 if (empty($_SESSION['pending_2fa_user_id'])) {
-    header('Location: /login.php');
+    header('Location: /login');
     exit;
 }
 ?>
@@ -147,7 +147,7 @@ if (empty($_SESSION['pending_2fa_user_id'])) {
 
           <!-- Return to Sign In Option -->
           <div class="text-center pt-2">
-            <a href="/two-factor-verify.php?action=cancel"
+            <a href="/two-factor-verify?action=cancel"
                class="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition group">
               <svg class="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
@@ -279,7 +279,7 @@ if (empty($_SESSION['pending_2fa_user_id'])) {
 
         if (data.success) {
           showToast('Verification successful! Redirecting to dashboard...', 'success');
-          const destination = data.redirect || (data.data && data.data.redirect) || '/dashboard.php';
+          const destination = data.redirect || (data.data && data.data.redirect) || '/dashboard';
           setTimeout(() => {
             window.location.href = destination;
           }, 300);

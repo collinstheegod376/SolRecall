@@ -132,7 +132,7 @@ class AuthController extends Controller
 
                 return Response::success([
                     'requires_2fa' => true,
-                    'redirect' => '/two-factor-verify.php',
+                    'redirect' => '/two-factor-verify',
                 ], '2FA verification required');
             }
 
@@ -452,7 +452,7 @@ class AuthController extends Controller
             }
 
             return Response::success([
-                'redirect' => '/dashboard.php',
+                'redirect' => '/dashboard',
                 'user' => $user->toSafeArray(),
                 'deposit_address' => $user->solana_deposit_address,
                 'balances' => $formattedBalances,

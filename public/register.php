@@ -4,7 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 if (isset($_SESSION['user_id'])) {
-    header('Location: /dashboard.php');
+    header('Location: /dashboard');
     exit;
 }
 
@@ -182,7 +182,7 @@ unset($_SESSION['flash_error'], $_SESSION['flash_success']);
         <!-- Switch to Login -->
         <p class="mt-6 text-center text-xs text-slate-400">
           Already have an account?
-          <a href="/login.php" class="font-semibold text-purple-400 hover:text-purple-300 ml-1 transition">
+          <a href="/login" class="font-semibold text-purple-400 hover:text-purple-300 ml-1 transition">
             Sign In &rarr;
           </a>
         </p>
@@ -246,7 +246,7 @@ unset($_SESSION['flash_error'], $_SESSION['flash_success']);
           const data = await res.json();
           if (data.success) {
             showToast('Account successfully created! Redirecting...', 'success');
-            setTimeout(() => { window.location.href = '/dashboard.php'; }, 800);
+            setTimeout(() => { window.location.href = '/dashboard'; }, 800);
           } else {
             showToast(data.message || data.error || 'Registration failed.', 'error');
           }

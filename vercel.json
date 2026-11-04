@@ -15,6 +15,18 @@
       "dest": "/public/logo.jpg"
     },
     {
+      "src": "/manifest.json",
+      "dest": "/public/manifest.json"
+    },
+    {
+      "src": "/sw.js",
+      "dest": "/public/sw.js"
+    },
+    {
+      "src": "/favicon.ico",
+      "dest": "/public/assets/img/logo.png"
+    },
+    {
       "src": "/api/cron",
       "dest": "/api/cron.php"
     },

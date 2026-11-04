@@ -38,7 +38,7 @@ class Require2FAMiddleware
             if ($isApi) {
                 return Response::error('Unauthorized. Authentication is required.', 401);
             }
-            return Response::redirect('/login.php');
+            return Response::redirect('/login');
         }
 
         // Check if 2FA is active
@@ -51,7 +51,7 @@ class Require2FAMiddleware
                     ['two_factor_required' => true]
                 );
             }
-            return Response::redirect('/dashboard.php#settings');
+            return Response::redirect('/dashboard#settings');
         }
 
         return $next($request);

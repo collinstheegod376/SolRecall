@@ -6,7 +6,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // Redirect if already logged in
 if (isset($_SESSION['user_id'])) {
-    header('Location: /dashboard.php');
+    header('Location: /dashboard');
     exit;
 }
 
@@ -191,7 +191,7 @@ unset($_SESSION['flash_error'], $_SESSION['flash_success']);
         <!-- Switch to Register -->
         <p class="mt-6 text-center text-xs text-slate-400">
           Don't have an account yet?
-          <a href="/register.php" class="font-semibold text-purple-400 hover:text-purple-300 ml-1 transition">
+          <a href="/register" class="font-semibold text-purple-400 hover:text-purple-300 ml-1 transition">
             Create an account &rarr;
           </a>
         </p>
@@ -281,12 +281,12 @@ unset($_SESSION['flash_error'], $_SESSION['flash_success']);
           const data = await res.json();
           const requires2fa = Boolean(data.requires_2fa || (data.data && data.data.requires_2fa));
           if (requires2fa) {
-            const dest = data.redirect || (data.data && data.data.redirect) || '/two-factor-verify.php';
+            const dest = data.redirect || (data.data && data.data.redirect) || '/two-factor-verify';
             window.location.href = dest;
             return;
           }
           if (data.success) {
-            window.location.href = '/dashboard.php';
+            window.location.href = '/dashboard';
           } else {
             showToast(data.message || data.error || 'Authentication failed. Please check your credentials.', 'error');
           }

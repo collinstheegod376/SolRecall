@@ -326,7 +326,7 @@
     });
 
     if (res.status === 401) {
-      window.location.href = '/login.php';
+      window.location.href = '/login';
       throw new Error('Authentication required. Redirecting to login...');
     }
 

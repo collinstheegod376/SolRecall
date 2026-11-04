@@ -209,7 +209,7 @@
           if (verifyData.success) {
             if (window.showToast) window.showToast('Wallet successfully verified! Redirecting...', 'success');
             setTimeout(() => {
-              window.location.href = '/dashboard.php';
+              window.location.href = '/dashboard';
             }, 800);
             return true;
           } else {

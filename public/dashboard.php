@@ -10,7 +10,7 @@ header('Expires: 0');
 
 // Enforce authenticated session
 if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
-    header('Location: /login.php');
+    header('Location: /login');
     exit;
 }
 
@@ -168,7 +168,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
 
         <!-- Left: Logo & Project Brand -->
         <div class="flex items-center gap-3">
-          <a href="/dashboard.php" class="flex items-center gap-2.5 group">
+          <a href="/dashboard" class="flex items-center gap-2.5 group">
             <img src="/assets/img/logo.png" alt="SolRecall Logo" class="w-9 h-9 rounded-xl shadow-md border border-purple-500/30 group-hover:scale-105 transition-transform duration-200 object-cover">
             <div>
               <div class="flex items-center gap-2">
