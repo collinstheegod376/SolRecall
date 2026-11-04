@@ -641,6 +641,13 @@ class TransferService
      */
     public function getBootstrapData(int $userId, bool $forceFresh = false): array
     {
+        // Automatically scan and credit on-chain incoming deposits
+        try {
+            $this->syncUserDeposits($userId);
+        } catch (\Throwable $e) {
+            error_log("Bootstrap deposit sync notice: " . $e->getMessage());
+        }
+
         $now = time();
         $ttl = 12; // 12-second session micro-cache
 

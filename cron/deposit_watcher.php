@@ -31,7 +31,7 @@ $verbose = isset($options['verbose']);
 echo "[" . date('Y-m-d H:i:s') . "] === Starting Solana Deposit Watcher & Escrow Broadcaster ===\n";
 
 $db = Database::getInstance();
-$rpcService = new SolanaRpcService();
+$rpcService = new SolanaRpcService(null, null, 15, $simulate);
 $keyService = new KeyManagementService();
 
 /**

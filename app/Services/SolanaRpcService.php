@@ -30,7 +30,7 @@ class SolanaRpcService
     public function __construct(
         ?string $rpcUrl = null,
         ?string $commitment = null,
-        int $timeout = 10,
+        int $timeout = 15,
         ?bool $simulationMode = null
     ) {
         $this->rpcUrl = $rpcUrl ?? (string) config('solana.rpc_url', 'https://api.mainnet-beta.solana.com');
@@ -111,22 +111,28 @@ class SolanaRpcService
         curl_close($ch);
 
         if ($response === false || $curlError !== '') {
-            error_log("Solana RPC network error on {$method}: {$curlError}. Falling back to simulation.");
-            $this->simulationMode = true;
-            return $this->handleSimulatedCall($method, $params);
+            if ($this->simulationMode) {
+                error_log("Solana RPC network error on {$method}: {$curlError}. Falling back to simulation.");
+                return $this->handleSimulatedCall($method, $params);
+            }
+            throw new RuntimeException("Solana RPC network error on {$method}: {$curlError}");
         }
 
         if ($httpCode >= 400) {
-            error_log("Solana RPC HTTP {$httpCode} error on {$method}: {$response}. Falling back to simulation.");
-            $this->simulationMode = true;
-            return $this->handleSimulatedCall($method, $params);
+            if ($this->simulationMode) {
+                error_log("Solana RPC HTTP {$httpCode} error on {$method}: {$response}. Falling back to simulation.");
+                return $this->handleSimulatedCall($method, $params);
+            }
+            throw new RuntimeException("Solana RPC HTTP {$httpCode} error on {$method}: {$response}");
         }
 
         $decoded = json_decode($response, true);
         if (!is_array($decoded)) {
-            error_log("Invalid JSON response from Solana RPC on {$method}. Falling back to simulation.");
-            $this->simulationMode = true;
-            return $this->handleSimulatedCall($method, $params);
+            if ($this->simulationMode) {
+                error_log("Invalid JSON response from Solana RPC on {$method}. Falling back to simulation.");
+                return $this->handleSimulatedCall($method, $params);
+            }
+            throw new RuntimeException("Invalid JSON response from Solana RPC on {$method}");
         }
 
         if (isset($decoded['error'])) {
