@@ -2080,6 +2080,295 @@
   }
   window.toggleRevealOrCopyKey = toggleRevealOrCopyKey;
 
+  // =========================================================================
+  // Administrator Operations (Live Platform Hot Wallet, Escrow Ledger, Overrides)
+  // =========================================================================
+
+  let adminTransfersCache = [];
+
+  async function loadAdminData(force = false) {
+    if (!AppState.user || !AppState.user.is_admin) {
+      return;
+    }
+
+    try {
+      const [statsRes, transfersRes] = await Promise.all([
+        apiFetch('/api/admin/stats'),
+        apiFetch('/api/admin/transfers')
+      ]);
+
+      if (statsRes && statsRes.success && statsRes.data) {
+        renderAdminStats(statsRes.data);
+      }
+
+      if (transfersRes && transfersRes.success && transfersRes.data) {
+        adminTransfersCache = transfersRes.data.transfers || [];
+        renderAdminTransfers(adminTransfersCache);
+      }
+    } catch (err) {
+      console.warn('[Admin] Failed to load admin operations data:', err);
+    }
+  }
+  window.loadAdminData = loadAdminData;
+
+  function renderAdminStats(data) {
+    const hw = data.hot_wallet || {};
+    const esc = data.active_escrow || {};
+    const pf = data.platform || {};
+
+    const hwSolEl = document.getElementById('adminHotWalletSol');
+    const hwAddrEl = document.getElementById('adminHotWalletAddrShort');
+    const hwLinkEl = document.getElementById('adminHotWalletExplorerLink');
+
+    if (hwSolEl) {
+      hwSolEl.innerHTML = `${formatAmount(hw.sol_balance || 0, 4)} <span class="text-xs text-slate-400 font-normal">SOL</span>`;
+    }
+    if (hwAddrEl) {
+      const addr = hw.address || '';
+      hwAddrEl.textContent = addr ? `${addr.slice(0, 4)}...${addr.slice(-4)}` : 'N/A';
+      hwAddrEl.title = addr;
+    }
+    if (hwLinkEl && hw.address) {
+      hwLinkEl.href = `https://explorer.solana.com/address/${hw.address}?cluster=devnet`;
+    }
+
+    // Active escrow card
+    const escEl = document.getElementById('adminActiveEscrow');
+    const escBadge = document.getElementById('adminActiveHoldsBadge');
+
+    if (escEl) {
+      const sol = esc.SOL || 0;
+      const usdc = esc.USDC || 0;
+      const usdt = esc.USDT || 0;
+      const stables = usdc + usdt;
+
+      if (sol > 0 && stables > 0) {
+        escEl.textContent = `${formatAmount(sol, 4)} SOL + $${formatAmount(stables, 2)}`;
+      } else if (sol > 0) {
+        escEl.textContent = `${formatAmount(sol, 4)} SOL`;
+      } else if (stables > 0) {
+        escEl.textContent = `$${formatAmount(stables, 2)} Stables`;
+      } else {
+        escEl.textContent = '0.0000 SOL';
+      }
+    }
+
+    if (escBadge) {
+      const count = esc.total_holds || 0;
+      escBadge.textContent = `${count} Hold${count === 1 ? '' : 's'}`;
+    }
+
+    // Platform revenue
+    const feeEl = document.getElementById('adminFeeRevenue');
+    const compCountEl = document.getElementById('adminCompletedCount');
+    if (feeEl) {
+      feeEl.textContent = `${formatAmount(pf.fee_revenue_sol || 0, 4)} SOL`;
+    }
+    if (compCountEl) {
+      compCountEl.textContent = `From ${pf.completed_transfers || 0} completed transfers`;
+    }
+
+    // Total Users
+    const usersEl = document.getElementById('adminTotalUsers');
+    if (usersEl) {
+      usersEl.innerHTML = `${pf.total_users || 0} <span class="text-xs text-slate-400 font-normal">Registered Users</span>`;
+    }
+  }
+
+  function renderAdminTransfers(transfers) {
+    const tbody = document.getElementById('adminTransfersTableBody');
+    const emptyState = document.getElementById('adminTransfersEmpty');
+    const countLabel = document.getElementById('adminTableCountLabel');
+
+    if (!tbody) return;
+
+    if (!Array.isArray(transfers) || transfers.length === 0) {
+      tbody.innerHTML = '';
+      if (emptyState) emptyState.classList.remove('hidden');
+      if (countLabel) countLabel.textContent = 'Showing 0 transfers';
+      return;
+    }
+
+    if (emptyState) emptyState.classList.add('hidden');
+    if (countLabel) countLabel.textContent = `Showing ${transfers.length} active hold${transfers.length === 1 ? '' : 's'}`;
+
+    tbody.innerHTML = transfers.map(t => {
+      const tokenLogo = (tokenLogos[t.token] || tokenLogos.SOL).url;
+      const remainingSec = t.seconds_remaining;
+      const isUrgent = remainingSec <= 60;
+      const shortDest = t.destination ? `${t.destination.slice(0, 4)}...${t.destination.slice(-4)}` : '';
+
+      return `
+        <tr class="hover:bg-white/[0.02] transition">
+          <td class="py-3 px-3 font-mono font-bold text-purple-400">#TX-${t.id}</td>
+          <td class="py-3 px-3">
+            <div class="font-medium text-white text-xs">${escapeHtml(t.username || 'User')}</div>
+            <div class="text-[10px] text-slate-400 font-mono">${escapeHtml(t.email || '')}</div>
+          </td>
+          <td class="py-3 px-3">
+            <span class="inline-flex items-center gap-1.5 font-bold font-mono text-white text-xs">
+              <img src="${tokenLogo}" alt="${t.token}" class="w-4 h-4 rounded-full inline">
+              ${formatAmount(t.amount, t.token === 'SOL' ? 4 : 2)} ${t.token}
+            </span>
+          </td>
+          <td class="py-3 px-3 font-mono text-amber-400 text-xs font-semibold">
+            +${formatAmount(t.platform_fee, t.token === 'SOL' ? 4 : 2)} ${t.token}
+          </td>
+          <td class="py-3 px-3 font-mono text-slate-300 text-xs">
+            <span title="${t.destination}">${shortDest}</span>
+            <button type="button" onclick="copyToClipboard('${t.destination}', 'Destination')" class="text-slate-500 hover:text-white ml-1">📋</button>
+          </td>
+          <td class="py-3 px-3">
+            <span class="inline-flex items-center gap-1 font-mono text-xs font-bold ${isUrgent ? 'text-rose-400' : 'text-amber-300'}">
+              ⏱ ${formatMMSS(remainingSec)}
+            </span>
+          </td>
+          <td class="py-3 px-3 text-right">
+            <div class="flex items-center justify-end gap-1.5">
+              <button type="button"
+                      onclick="adminForceBroadcast(${t.id})"
+                      class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-purple-600/20 text-purple-300 border border-purple-500/30 hover:bg-purple-600/40 transition cursor-pointer"
+                      title="Force immediate broadcast on Solana">
+                Release Now
+              </button>
+              <button type="button"
+                      onclick="adminForceCancel(${t.id})"
+                      class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-rose-600/20 text-rose-300 border border-rose-500/30 hover:bg-rose-600/40 transition cursor-pointer"
+                      title="Revoke and refund user available balance">
+                Refund
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  async function adminTriggerCron() {
+    const btn = document.getElementById('btnAdminTriggerCron');
+    const spinner = document.getElementById('adminCronSpinner');
+    const icon = document.getElementById('adminCronIcon');
+
+    if (btn) btn.disabled = true;
+    if (spinner) spinner.classList.remove('hidden');
+    if (icon) icon.classList.add('hidden');
+
+    try {
+      const res = await apiFetch('/api/admin/trigger-cron', { method: 'POST' });
+      if (res && res.success) {
+        const d = res.data || {};
+        showToast(`Broadcaster executed: ${d.processed || 0} processed, ${d.deposits_credited || 0} deposits credited (${d.duration_ms || 0}ms)`, 'success', 4000);
+        await loadAdminData(true);
+      } else {
+        showToast(res.error || 'Failed to trigger broadcaster cycle.', 'error');
+      }
+    } catch (err) {
+      showToast(err.message || 'Network error triggering broadcaster.', 'error');
+    } finally {
+      if (btn) btn.disabled = false;
+      if (spinner) spinner.classList.add('hidden');
+      if (icon) icon.classList.remove('hidden');
+    }
+  }
+  window.adminTriggerCron = adminTriggerCron;
+
+  async function adminForceCancel(transferId) {
+    if (!confirm(`Are you sure you want to FORCE-CANCEL transfer #${transferId}?\n\nThis will instantly refund the user's principal, platform fee, and network gas to their available balance.`)) {
+      return;
+    }
+
+    try {
+      const res = await apiFetch('/api/admin/force-cancel', {
+        method: 'POST',
+        body: JSON.stringify({ transfer_id: transferId })
+      });
+
+      if (res && res.success) {
+        showToast(res.data?.message || `Transfer #${transferId} refunded.`, 'success');
+        await loadAdminData(true);
+      } else {
+        showToast(res.error || 'Failed to force-cancel transfer.', 'error');
+      }
+    } catch (err) {
+      showToast(err.message || 'Network error.', 'error');
+    }
+  }
+  window.adminForceCancel = adminForceCancel;
+
+  async function adminForceBroadcast(transferId) {
+    if (!confirm(`Are you sure you want to FORCE-BROADCAST transfer #${transferId} immediately on Solana Devnet?\n\nThis will bypass any remaining timelock window and submit the transaction on-chain.`)) {
+      return;
+    }
+
+    try {
+      const res = await apiFetch('/api/admin/force-broadcast', {
+        method: 'POST',
+        body: JSON.stringify({ transfer_id: transferId })
+      });
+
+      if (res && res.success) {
+        showToast(`Transfer #${transferId} broadcast! Signature: ${res.data?.tx_signature?.slice(0, 12)}...`, 'success', 5000);
+        await loadAdminData(true);
+      } else {
+        showToast(res.error || 'Failed to broadcast transfer on-chain.', 'error');
+      }
+    } catch (err) {
+      showToast(err.message || 'Network error.', 'error');
+    }
+  }
+  window.adminForceBroadcast = adminForceBroadcast;
+
+  async function loadAdminUsers() {
+    const tbody = document.getElementById('adminUsersTableBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-slate-500"><span class="spinner-sm inline-block mr-2"></span> Loading registered users from Supabase...</td></tr>`;
+
+    try {
+      const res = await apiFetch('/api/admin/users');
+      if (res && res.success && res.data && Array.isArray(res.data.users)) {
+        const users = res.data.users;
+        if (users.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-slate-500">No registered users found.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = users.map(u => {
+          const shortDep = u.solana_deposit_address ? `${u.solana_deposit_address.slice(0, 6)}...${u.solana_deposit_address.slice(-6)}` : 'None';
+          const isAdmin = (intVal) => intVal === 1 || intVal === '1';
+
+          return `
+            <tr class="hover:bg-white/[0.02] transition">
+              <td class="py-3 px-3 font-mono text-slate-400">#${u.id}</td>
+              <td class="py-3 px-3">
+                <div class="font-bold text-white text-xs">${escapeHtml(u.username)}</div>
+                <div class="text-[10px] text-slate-400 font-mono">${escapeHtml(u.email)}</div>
+              </td>
+              <td class="py-3 px-3 font-mono text-purple-300 text-xs">
+                <span>${shortDep}</span>
+                ${u.solana_deposit_address ? `<button type="button" onclick="copyToClipboard('${u.solana_deposit_address}', 'Deposit Address')" class="text-slate-500 hover:text-white ml-1">📋</button>` : ''}
+              </td>
+              <td class="py-3 px-3 font-mono font-bold text-white text-xs">${formatAmount(u.sol_avail || 0, 4)} SOL</td>
+              <td class="py-3 px-3 font-mono text-blue-300 text-xs">$${formatAmount(u.usdc_avail || 0, 2)}</td>
+              <td class="py-3 px-3 font-mono text-emerald-300 text-xs">$${formatAmount(u.usdt_avail || 0, 2)}</td>
+              <td class="py-3 px-3">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  ${isAdmin(u.is_admin) ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">Admin</span>' : '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-800 text-slate-400">User</span>'}
+                  ${u.two_factor_enabled ? '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-500/20 text-emerald-400">2FA</span>' : '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-800 text-slate-500">No 2FA</span>'}
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } else {
+        tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-rose-400">Failed to load users: ${res?.error || 'Unknown error'}</td></tr>`;
+      }
+    } catch (e) {
+      tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-rose-400">Error: ${e.message}</td></tr>`;
+    }
+  }
+  window.loadAdminUsers = loadAdminUsers;
+
   // Tab Switching (Overview, History, Settings, Admin)
   function setupTabs() {
     const tabButtons = document.querySelectorAll('[data-tab-target]');
@@ -2130,6 +2419,8 @@
       try { renderHistoryTable(); } catch (e) { console.error('History tab render error:', e); }
     } else if (tabId === 'settings') {
       try { setupSettings(); } catch (e) { console.error('Settings tab setup error:', e); }
+    } else if (tabId === 'admin') {
+      try { loadAdminData(true); } catch (e) { console.error('Admin tab load error:', e); }
     }
 
     // Scroll to top only if requested

@@ -10,6 +10,7 @@ declare(strict_types=1);
 use App\Core\Router;
 use App\Controllers\AuthController;
 use App\Controllers\TransferController;
+use App\Controllers\AdminController;
 
 /**
  * Register API routes onto Router instance if provided.
@@ -55,4 +56,14 @@ return function (Router $router): void {
 
     // Settings
     $router->post('/api/settings', [TransferController::class, 'updateSettings']);
+
+    // -------------------------------------------------------------------------
+    // Administrator Operations Endpoints
+    // -------------------------------------------------------------------------
+    $router->get('/api/admin/stats', [AdminController::class, 'stats']);
+    $router->get('/api/admin/transfers', [AdminController::class, 'transfers']);
+    $router->post('/api/admin/trigger-cron', [AdminController::class, 'triggerCron']);
+    $router->post('/api/admin/force-cancel', [AdminController::class, 'forceCancel']);
+    $router->post('/api/admin/force-broadcast', [AdminController::class, 'forceBroadcast']);
+    $router->get('/api/admin/users', [AdminController::class, 'users']);
 };

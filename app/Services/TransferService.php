@@ -614,15 +614,24 @@ class TransferService
     /**
      * Invalidate session micro-cache for user balances and bootstrap data.
      */
-    public static function invalidateBalanceCache(int $userId): void
+    public static function invalidateBalanceCache(?int $userId = null): void
     {
         if (session_status() === PHP_SESSION_ACTIVE) {
-            unset(
-                $_SESSION['cached_balances'][$userId],
-                $_SESSION['cached_balances_time'][$userId],
-                $_SESSION['cached_bootstrap'][$userId],
-                $_SESSION['cached_bootstrap_time'][$userId]
-            );
+            if ($userId !== null) {
+                unset(
+                    $_SESSION['cached_balances'][$userId],
+                    $_SESSION['cached_balances_time'][$userId],
+                    $_SESSION['cached_bootstrap'][$userId],
+                    $_SESSION['cached_bootstrap_time'][$userId]
+                );
+            } else {
+                unset(
+                    $_SESSION['cached_balances'],
+                    $_SESSION['cached_balances_time'],
+                    $_SESSION['cached_bootstrap'],
+                    $_SESSION['cached_bootstrap_time']
+                );
+            }
         }
     }
 

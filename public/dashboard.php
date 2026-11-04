@@ -805,88 +805,183 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
       <?php if ($isAdmin): ?>
       <section id="tab-content-admin" class="dashboard-tab-content hidden space-y-6">
 
-        <div class="flex items-center justify-between">
+        <!-- Admin Header & Power Tools -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 class="text-xl font-bold text-white tracking-tight">Platform Hot Wallet & Escrow Ledger</h2>
-            <p class="text-xs text-slate-400">Platform-wide pending transfers and RPC broadcaster status</p>
+            <div class="flex items-center gap-2">
+              <h2 class="text-xl font-bold text-white tracking-tight">Platform Hot Wallet & Escrow Ledger</h2>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30">ADMINISTRATOR</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-0.5">Platform-wide pending transfers, real-time RPC broadcaster, and administrative overrides</p>
           </div>
-          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-            Cron Daemon: Running
-          </span>
+
+          <div class="flex items-center gap-2 flex-wrap">
+            <button type="button"
+                    id="btnAdminTriggerCron"
+                    onclick="adminTriggerCron()"
+                    class="px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 border border-emerald-400/30 shadow-lg shadow-emerald-600/20 transition flex items-center gap-1.5 cursor-pointer active:scale-95">
+              <span id="adminCronSpinner" class="hidden spinner-sm"></span>
+              <svg id="adminCronIcon" class="w-3.5 h-3.5 text-emerald-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+              </svg>
+              <span>Run Broadcaster & Sync</span>
+            </button>
+
+            <button type="button"
+                    onclick="loadAdminData(true)"
+                    class="px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700/80 border border-white/10 transition flex items-center gap-1.5 cursor-pointer">
+              <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+              </svg>
+              <span>Refresh</span>
+            </button>
+          </div>
         </div>
 
-        <!-- Hot Wallet Metrics Grid -->
-        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
-          <div class="glass-panel rounded-2xl p-4">
-            <div class="text-xs text-slate-400 font-semibold uppercase flex items-center gap-1.5">
-              <img src="/assets/img/sol.png" onerror="this.src='/assets/img/sol.png'" alt="SOL" class="w-3.5 h-3.5 rounded-full inline">
-              Hot Wallet SOL
+        <!-- Hot Wallet & Live Platform Metrics Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+          <!-- Metric 1: Platform Hot Wallet -->
+          <div class="glass-panel rounded-2xl p-4 border border-white/10 relative overflow-hidden">
+            <div class="text-xs text-slate-400 font-semibold uppercase flex items-center justify-between">
+              <span class="flex items-center gap-1.5">
+                <img src="/assets/img/sol.png" onerror="this.src='/assets/img/sol.png'" alt="SOL" class="w-3.5 h-3.5 rounded-full inline">
+                Hot Wallet SOL
+              </span>
+              <span class="w-2 h-2 rounded-full bg-emerald-400" title="Connected to Solana Devnet"></span>
             </div>
-            <div class="text-xl font-black text-white font-mono mt-1">450.28 <span class="text-xs text-slate-400 font-normal">SOL</span></div>
-            <div class="text-[11px] text-slate-500 mt-1">Gas reserve healthy</div>
-          </div>
-          <div class="glass-panel rounded-2xl p-4">
-            <div class="text-xs text-slate-400 font-semibold uppercase flex items-center gap-1.5">
-              <img src="/assets/img/usdc.png" onerror="this.src='/assets/img/usdc.png'" alt="USDC" class="w-3.5 h-3.5 rounded-full inline">
-              Hot Wallet USDC
+            <div class="text-2xl font-black text-white font-mono mt-1" id="adminHotWalletSol">
+              0.0000 <span class="text-xs text-slate-400 font-normal">SOL</span>
             </div>
-            <div class="text-xl font-black text-white font-mono mt-1">15,420.00 <span class="text-xs text-slate-400 font-normal">USDC</span></div>
-            <div class="text-[11px] text-slate-500 mt-1">SPL ATA liquid</div>
+            <div class="text-[11px] text-slate-400 mt-1.5 flex items-center justify-between">
+              <span id="adminHotWalletAddrShort" class="font-mono text-purple-300 truncate max-w-[130px]">Loading...</span>
+              <a id="adminHotWalletExplorerLink" href="https://explorer.solana.com/?cluster=devnet" target="_blank" rel="noopener" class="text-purple-400 hover:text-purple-300 hover:underline">Explorer ↗</a>
+            </div>
           </div>
-          <div class="glass-panel rounded-2xl p-4">
-            <div class="text-xs text-slate-400 font-semibold uppercase">Pending System Escrow</div>
-            <div class="text-xl font-black text-amber-400 font-mono mt-1">2 Active Holds</div>
-            <div class="text-[11px] text-slate-500 mt-1">Across all users</div>
+
+          <!-- Metric 2: Active System Escrow -->
+          <div class="glass-panel rounded-2xl p-4 border border-amber-500/20 bg-gradient-to-br from-amber-500/5 via-transparent to-transparent">
+            <div class="text-xs text-amber-300 font-semibold uppercase flex items-center justify-between">
+              <span>Platform Escrow Locked</span>
+              <span id="adminActiveHoldsBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">0 Holds</span>
+            </div>
+            <div class="text-2xl font-black text-white font-mono mt-1" id="adminActiveEscrow">
+              0.0000 SOL
+            </div>
+            <div class="text-[11px] text-slate-400 mt-1.5" id="adminActiveEscrowSubtext">
+              Across all users in undo window
+            </div>
           </div>
-          <div class="glass-panel rounded-2xl p-4">
-            <div class="text-xs text-slate-400 font-semibold uppercase">Broadcaster Tick</div>
-            <div class="text-xl font-black text-white font-mono mt-1">1m Cron</div>
-            <div class="text-[11px] text-slate-500 mt-1">Status: Active</div>
+
+          <!-- Metric 3: Platform Fees (12% Accumulated) -->
+          <div class="glass-panel rounded-2xl p-4 border border-purple-500/20 bg-gradient-to-br from-purple-500/5 via-transparent to-transparent">
+            <div class="text-xs text-purple-300 font-semibold uppercase flex items-center justify-between">
+              <span>Platform Fee Revenue</span>
+              <span class="text-[10px] text-slate-400">12% Fee</span>
+            </div>
+            <div class="text-2xl font-black text-purple-300 font-mono mt-1" id="adminFeeRevenue">
+              0.0000 SOL
+            </div>
+            <div class="text-[11px] text-slate-400 mt-1.5" id="adminCompletedCount">
+              From completed transfers
+            </div>
           </div>
+
+          <!-- Metric 4: Platform Users & Timer Status -->
+          <div class="glass-panel rounded-2xl p-4 border border-white/10">
+            <div class="text-xs text-slate-400 font-semibold uppercase flex items-center justify-between">
+              <span>System & Timer Engine</span>
+              <span class="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-medium">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Live
+              </span>
+            </div>
+            <div class="text-xl font-bold text-white tracking-tight mt-1" id="adminTotalUsers">
+              0 <span class="text-xs text-slate-400 font-normal">Registered Users</span>
+            </div>
+            <div class="text-[11px] text-emerald-300/90 mt-1.5 font-mono truncate" title="Supabase pg_cron + Opportunistic Engine">
+              Supabase pg_cron &bull; 1m timer
+            </div>
+          </div>
+
         </div>
 
         <!-- Admin Table of Platform Escrow -->
-        <div class="glass-panel rounded-2xl border border-white/10 p-5">
-          <h3 class="text-sm font-bold text-white mb-3">All Active Escrow Transfers (Platform-Wide)</h3>
+        <div class="glass-panel rounded-2xl border border-white/10 p-5 space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 class="text-base font-bold text-white tracking-tight">Active Escrow Holds (Platform-Wide)</h3>
+              <p class="text-xs text-slate-400">Every timelocked transfer currently in flight across all registered users</p>
+            </div>
+            <span class="text-xs text-slate-400 font-mono" id="adminTableCountLabel">Showing 0 transfers</span>
+          </div>
+
           <div class="overflow-x-auto">
             <table class="w-full text-left text-xs border-collapse">
               <thead>
                 <tr class="border-b border-white/10 text-slate-400 font-bold uppercase text-[10px]">
                   <th class="py-2.5 px-3">Transfer ID</th>
                   <th class="py-2.5 px-3">User</th>
-                  <th class="py-2.5 px-3">Amount</th>
+                  <th class="py-2.5 px-3">Principal Amount</th>
+                  <th class="py-2.5 px-3">Platform Fee (12%)</th>
                   <th class="py-2.5 px-3">Destination</th>
-                  <th class="py-2.5 px-3">Expires At</th>
-                  <th class="py-2.5 px-3">Status</th>
+                  <th class="py-2.5 px-3">Expires At / Timer</th>
+                  <th class="py-2.5 px-3 text-right">Admin Override Actions</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-white/5">
+              <tbody id="adminTransfersTableBody" class="divide-y divide-white/5">
                 <tr>
-                  <td class="py-3 px-3 font-mono text-purple-400">#TX-101</td>
-                  <td class="py-3 px-3">alex@undo.sol</td>
-                  <td class="py-3 px-3 font-bold text-white">
-                    <span class="inline-flex items-center gap-1">
-                      <img src="/assets/img/sol.png" onerror="this.src='/assets/img/sol.png'" alt="SOL" class="w-3.5 h-3.5 rounded-full inline">
-                      0.75 SOL
-                    </span>
+                  <td colspan="7" class="py-8 text-center text-slate-500">
+                    <span class="spinner-sm inline-block mr-2"></span> Loading platform escrow transfers...
                   </td>
-                  <td class="py-3 px-3 font-mono text-slate-300">9WzD...AWWM</td>
-                  <td class="py-3 px-3 text-amber-300 font-mono">In 6m 30s</td>
-                  <td class="py-3 px-3"><span class="badge-pending px-2 py-0.5 rounded text-[10px]">Escrow Hold</span></td>
                 </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Empty state for admin table -->
+          <div id="adminTransfersEmpty" class="hidden py-8 text-center">
+            <div class="w-10 h-10 mx-auto rounded-xl bg-slate-800/80 flex items-center justify-center text-slate-400 mb-2">
+              <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              </svg>
+            </div>
+            <p class="text-xs font-bold text-slate-300">No Active Escrow Holds System-Wide</p>
+            <p class="text-[11px] text-slate-500 mt-0.5">All user transfers have settled or been refunded.</p>
+          </div>
+        </div>
+
+        <!-- Registered Platform Users Sub-Section -->
+        <div class="glass-panel rounded-2xl border border-white/10 p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-base font-bold text-white tracking-tight">Registered Platform Users & Deposit Wallets</h3>
+              <p class="text-xs text-slate-400">Users, custodial Solana deposit keys, and ledger balances on Supabase</p>
+            </div>
+            <button type="button"
+                    onclick="loadAdminUsers()"
+                    class="text-xs text-purple-400 hover:text-purple-300 font-semibold cursor-pointer">
+              Refresh Directory
+            </button>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr class="border-b border-white/10 text-slate-400 font-bold uppercase text-[10px]">
+                  <th class="py-2.5 px-3">User ID</th>
+                  <th class="py-2.5 px-3">Username & Email</th>
+                  <th class="py-2.5 px-3">Custodial Deposit Address</th>
+                  <th class="py-2.5 px-3">SOL Balance</th>
+                  <th class="py-2.5 px-3">USDC Balance</th>
+                  <th class="py-2.5 px-3">USDT Balance</th>
+                  <th class="py-2.5 px-3">Security & Role</th>
+                </tr>
+              </thead>
+              <tbody id="adminUsersTableBody" class="divide-y divide-white/5">
                 <tr>
-                  <td class="py-3 px-3 font-mono text-purple-400">#TX-102</td>
-                  <td class="py-3 px-3">alex@undo.sol</td>
-                  <td class="py-3 px-3 font-bold text-white">
-                    <span class="inline-flex items-center gap-1">
-                      <img src="/assets/img/usdc.png" onerror="this.src='/assets/img/usdc.png'" alt="USDC" class="w-3.5 h-3.5 rounded-full inline">
-                      50.00 USDC
-                    </span>
+                  <td colspan="7" class="py-6 text-center text-slate-500">
+                    Click "Refresh Directory" or view tab to inspect user balances.
                   </td>
-                  <td class="py-3 px-3 font-mono text-slate-300">EPjF...Dt1v</td>
-                  <td class="py-3 px-3 text-amber-300 font-mono">In 3m 00s</td>
-                  <td class="py-3 px-3"><span class="badge-pending px-2 py-0.5 rounded text-[10px]">Escrow Hold</span></td>
                 </tr>
               </tbody>
             </table>

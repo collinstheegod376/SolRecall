@@ -224,6 +224,30 @@ if (str_starts_with($path, '/api/')) {
             exit;
         }
 
+        // E. Admin Operations Endpoints: /api/admin/*
+        if (str_starts_with($path, '/api/admin/')) {
+            $sub = substr($path, strlen('/api/admin/'));
+            $controller = new \App\Controllers\AdminController();
+            $req = Request::createFromGlobals();
+
+            $actionMethod = match ($sub) {
+                'stats' => 'stats',
+                'transfers' => 'transfers',
+                'trigger-cron' => 'triggerCron',
+                'force-cancel' => 'forceCancel',
+                'force-broadcast' => 'forceBroadcast',
+                'users' => 'users',
+                default => null
+            };
+
+            if ($actionMethod && method_exists($controller, $actionMethod)) {
+                $controller->$actionMethod($req)->send();
+                exit;
+            }
+
+            sendJson(['success' => false, 'error' => "Admin endpoint '/api/admin/{$sub}' not found"], 404);
+        }
+
         sendJson(['success' => false, 'error' => "API endpoint not found: {$path}"], 404);
     } catch (\Throwable $e) {
         $code = (int) $e->getCode();
