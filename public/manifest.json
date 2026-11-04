@@ -2,7 +2,7 @@
   "name": "SolRecall",
   "short_name": "SolRecall",
   "description": "SolRecall - Reversible Time-Locked Escrow on Solana",
-  "start_url": "/dashboard.php",
+  "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
