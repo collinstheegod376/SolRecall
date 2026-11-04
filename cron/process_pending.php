@@ -93,14 +93,13 @@ try {
 
         $processed++;
 
-        // 3. Resolve user signing key and hot wallet fee sponsor key
+        // 3. Resolve user signing key (user pays own network fee, no hot wallet sponsorship)
         $userSigningKey = $keyService->resolveSigningKey($transfer['encrypted_private_key'] ?? null);
-        $hotWalletKey = $keyService->resolveSigningKey(null);
 
         try {
-            // 4. Broadcast on-chain transaction via SolanaRpcService with fee sponsorship
-            echo "    Broadcasting transaction to Solana cluster (Hot wallet fee sponsored)...\n";
-            $txSignature = $rpcService->broadcastTransfer($userSigningKey, $destination, $amount, $token, $hotWalletKey);
+            // 4. Broadcast on-chain transaction via SolanaRpcService (user pays network fee)
+            echo "    Broadcasting transaction to Solana cluster (User custodial wallet pays network fee)...\n";
+            $txSignature = $rpcService->broadcastTransfer($userSigningKey, $destination, $amount, $token, null);
             echo "    [ON-CHAIN SUCCESS] Tx Signature: {$txSignature}\n";
 
             // 5. On success: Atomically deduct escrow in user_balances & mark completed
@@ -128,15 +127,30 @@ try {
             $errorMessage = $broadcastError->getMessage();
             echo "    [BROADCAST ERROR] " . $errorMessage . "\n";
 
-            // 6. On failure: Atomically revert escrow back to available balance & mark failed
+            // 6. On failure: Atomically revert escrow and fees back to available balance & mark failed
             try {
                 $db->transaction(function (Database $db) use ($transferId, $userId, $token, $amount, $errorMessage) {
                     $failedAt = date('Y-m-d H:i:s');
-                    // Revert escrow back to available
-                    $db->execute(
-                        "UPDATE user_balances SET escrow = escrow - ?, available = available + ? WHERE user_id = ? AND token = ?",
-                        [$amount, $amount, $userId, $token]
-                    );
+                    $platformFee = round($amount * 0.12, 6);
+                    $gasFee = 0.000005;
+
+                    if ($token === 'SOL') {
+                        $totalRefund = round($amount + $platformFee + $gasFee, 6);
+                        $db->execute(
+                            "UPDATE user_balances SET escrow = escrow - ?, available = available + ? WHERE user_id = ? AND token = ?",
+                            [$amount, $totalRefund, $userId, 'SOL']
+                        );
+                    } else {
+                        $totalRefundToken = round($amount + $platformFee, 6);
+                        $db->execute(
+                            "UPDATE user_balances SET escrow = escrow - ?, available = available + ? WHERE user_id = ? AND token = ?",
+                            [$amount, $totalRefundToken, $userId, $token]
+                        );
+                        $db->execute(
+                            "UPDATE user_balances SET available = available + ? WHERE user_id = ? AND token = ?",
+                            [$gasFee, $userId, 'SOL']
+                        );
+                    }
 
                     // Mark transfer as failed
                     $db->execute(
@@ -147,7 +161,7 @@ try {
                     );
                 });
 
-                echo "    [REVERTED] Funds refunded from escrow back to available balance.\n";
+                echo "    [REVERTED] Funds and fees refunded from escrow back to available balance.\n";
             } catch (Throwable $revertError) {
                 echo "    [CRITICAL ERROR] Failed to revert escrow for transfer #{$transferId}: " . $revertError->getMessage() . "\n";
             }

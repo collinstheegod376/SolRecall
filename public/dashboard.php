@@ -32,6 +32,74 @@ $username = htmlspecialchars((string) ($_SESSION['username'] ?? 'User'), ENT_QUO
 $userEmail = htmlspecialchars((string) ($_SESSION['email'] ?? ''), ENT_QUOTES, 'UTF-8');
 $depositAddress = htmlspecialchars((string) ($_SESSION['solana_deposit_address'] ?? ''), ENT_QUOTES, 'UTF-8');
 $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
+
+// Pre-fetch server-side for zero-flicker SSR
+$ssrBalances = [
+    'SOL'  => ['available' => 0.0, 'escrow' => 0.0, 'price' => 185.0],
+    'USDC' => ['available' => 0.0, 'escrow' => 0.0, 'price' => 1.0],
+    'USDT' => ['available' => 0.0, 'escrow' => 0.0, 'price' => 1.0],
+];
+$ssrPending = [];
+$ssrHistory = [];
+$ssrSettings = ['undoWindowMinutes' => 10];
+
+try {
+    $transferService = new \App\Services\TransferService();
+    $fetchedBalances = $transferService->getUserBalances($userId);
+    if (!empty($fetchedBalances)) {
+        $ssrBalances = $fetchedBalances;
+        if (isset($ssrBalances['SOL']) && !isset($ssrBalances['SOL']['price'])) {
+            $ssrBalances['SOL']['price'] = 185.0;
+        }
+        if (isset($ssrBalances['USDC']) && !isset($ssrBalances['USDC']['price'])) {
+            $ssrBalances['USDC']['price'] = 1.0;
+        }
+        if (isset($ssrBalances['USDT']) && !isset($ssrBalances['USDT']['price'])) {
+            $ssrBalances['USDT']['price'] = 1.0;
+        }
+    }
+    $ssrPending = $transferService->getPendingTransfers($userId);
+    $ssrHistory = $transferService->getTransferHistory($userId, 20);
+    $ssrSettings = ['undoWindowMinutes' => (int) config('undo_window.default_minutes', 10)];
+} catch (\Throwable $e) {
+    // Graceful fallback to default values
+}
+
+// Pre-calculate display balances and escrow values for SSR
+$ssrSolAvail = (float) ($ssrBalances['SOL']['available'] ?? 0);
+$ssrSolEscrow = (float) ($ssrBalances['SOL']['escrow'] ?? 0);
+$ssrSolPrice = (float) ($ssrBalances['SOL']['price'] ?? 185.0);
+$ssrSolFiat = ($ssrSolAvail + $ssrSolEscrow) * $ssrSolPrice;
+
+$ssrUsdcAvail = (float) ($ssrBalances['USDC']['available'] ?? 0);
+$ssrUsdcEscrow = (float) ($ssrBalances['USDC']['escrow'] ?? 0);
+$ssrUsdcFiat = ($ssrUsdcAvail + $ssrUsdcEscrow) * 1.0;
+
+$ssrUsdtAvail = (float) ($ssrBalances['USDT']['available'] ?? 0);
+$ssrUsdtEscrow = (float) ($ssrBalances['USDT']['escrow'] ?? 0);
+$ssrUsdtFiat = ($ssrUsdtAvail + $ssrUsdtEscrow) * 1.0;
+
+// Escrow shielded amounts
+$ssrPendingSol = 0.0;
+$ssrPendingUsdc = 0.0;
+$ssrPendingUsdt = 0.0;
+$ssrActivePendingCount = 0;
+if (is_array($ssrPending)) {
+    foreach ($ssrPending as $p) {
+        if (($p['status'] ?? '') === 'pending') {
+            $ssrActivePendingCount++;
+            $amt = (float) ($p['amount'] ?? 0);
+            $tok = strtoupper((string) ($p['token'] ?? ''));
+            if ($tok === 'SOL') $ssrPendingSol += $amt;
+            elseif ($tok === 'USDC') $ssrPendingUsdc += $amt;
+            elseif ($tok === 'USDT') $ssrPendingUsdt += $amt;
+        }
+    }
+}
+$ssrActiveSolEscrow = max($ssrSolEscrow, $ssrPendingSol);
+$ssrActiveUsdcEscrow = max($ssrUsdcEscrow, $ssrPendingUsdc);
+$ssrActiveUsdtEscrow = max($ssrUsdtEscrow, $ssrPendingUsdt);
+$ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
 ?>
 <!DOCTYPE html>
 <html lang="en" class="dark">
@@ -150,7 +218,7 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
                   class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-white/10 text-xs text-slate-200 transition group shadow-sm"
                   title="Click to view Deposit QR Code">
             <span class="text-slate-400 text-[11px] uppercase font-semibold hidden sm:inline">Deposit:</span>
-            <span id="userDepositAddress" class="font-mono text-purple-300 font-medium">7xKX...gAsU</span>
+            <span id="userDepositAddress" class="font-mono text-purple-300 font-medium" data-full="<?= $depositAddress ?>"><?= !empty($depositAddress) ? (strlen($depositAddress) > 12 ? substr($depositAddress, 0, 4) . '...' . substr($depositAddress, -4) : $depositAddress) : 'Deposit' ?></span>
             <svg class="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"/>
             </svg>
@@ -237,7 +305,7 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
                      class="w-8 h-8 rounded-full object-contain shrink-0 p-0.5 bg-black/40 border border-purple-500/30">
                 <div>
                   <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300">Solana (SOL)</h3>
-                  <span id="bal-fiat-sol" class="text-[11px] text-slate-400 font-mono">≈ $0.00</span>
+                  <span id="bal-fiat-sol" class="text-[11px] text-slate-400 font-mono">≈ $<?= number_format($ssrSolFiat, 2) ?></span>
                 </div>
               </div>
               <button onclick="openDepositModal()" class="text-xs text-purple-400 hover:text-purple-300 font-semibold transition">+ Deposit</button>
@@ -245,13 +313,13 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
             <div class="space-y-1.5 mt-2">
               <div class="flex items-baseline justify-between">
                 <span class="text-xs text-slate-400">Available:</span>
-                <span id="bal-avail-sol" class="text-xl font-extrabold text-white font-mono">0.0000</span>
+                <span id="bal-avail-sol" class="text-xl font-extrabold text-white font-mono"><?= number_format($ssrSolAvail, 4, '.', '') ?></span>
               </div>
               <div class="flex items-baseline justify-between text-xs pt-1 border-t border-white/5">
                 <span class="text-amber-400/90 flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> In Escrow:
                 </span>
-                <span id="bal-escrow-sol" class="font-mono text-amber-300 font-medium">0.0000</span>
+                <span id="bal-escrow-sol" class="font-mono text-amber-300 font-medium"><?= number_format($ssrSolEscrow, 4, '.', '') ?></span>
               </div>
             </div>
           </div>
@@ -266,7 +334,7 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
                      class="w-8 h-8 rounded-full object-contain shrink-0 p-0.5 bg-black/40 border border-blue-500/30">
                 <div>
                   <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300">USD Coin (USDC)</h3>
-                  <span id="bal-fiat-usdc" class="text-[11px] text-slate-400 font-mono">≈ $0.00</span>
+                  <span id="bal-fiat-usdc" class="text-[11px] text-slate-400 font-mono">≈ $<?= number_format($ssrUsdcFiat, 2) ?></span>
                 </div>
               </div>
               <button onclick="openDepositModal()" class="text-xs text-blue-400 hover:text-blue-300 font-semibold transition">+ Deposit</button>
@@ -274,13 +342,13 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
             <div class="space-y-1.5 mt-2">
               <div class="flex items-baseline justify-between">
                 <span class="text-xs text-slate-400">Available:</span>
-                <span id="bal-avail-usdc" class="text-xl font-extrabold text-white font-mono">0.00</span>
+                <span id="bal-avail-usdc" class="text-xl font-extrabold text-white font-mono"><?= number_format($ssrUsdcAvail, 2, '.', '') ?></span>
               </div>
               <div class="flex items-baseline justify-between text-xs pt-1 border-t border-white/5">
                 <span class="text-amber-400/90 flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> In Escrow:
                 </span>
-                <span id="bal-escrow-usdc" class="font-mono text-amber-300 font-medium">0.00</span>
+                <span id="bal-escrow-usdc" class="font-mono text-amber-300 font-medium"><?= number_format($ssrUsdcEscrow, 2, '.', '') ?></span>
               </div>
             </div>
           </div>
@@ -295,7 +363,7 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
                      class="w-8 h-8 rounded-full object-contain shrink-0 p-0.5 bg-black/40 border border-emerald-500/30">
                 <div>
                   <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300">Tether (USDT)</h3>
-                  <span id="bal-fiat-usdt" class="text-[11px] text-slate-400 font-mono">≈ $0.00</span>
+                  <span id="bal-fiat-usdt" class="text-[11px] text-slate-400 font-mono">≈ $<?= number_format($ssrUsdtFiat, 2) ?></span>
                 </div>
               </div>
               <button onclick="openDepositModal()" class="text-xs text-emerald-400 hover:text-emerald-300 font-semibold transition">+ Deposit</button>
@@ -303,13 +371,13 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
             <div class="space-y-1.5 mt-2">
               <div class="flex items-baseline justify-between">
                 <span class="text-xs text-slate-400">Available:</span>
-                <span id="bal-avail-usdt" class="text-xl font-extrabold text-white font-mono">0.00</span>
+                <span id="bal-avail-usdt" class="text-xl font-extrabold text-white font-mono"><?= number_format($ssrUsdtAvail, 2, '.', '') ?></span>
               </div>
               <div class="flex items-baseline justify-between text-xs pt-1 border-t border-white/5">
                 <span class="text-amber-400/90 flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> In Escrow:
                 </span>
-                <span id="bal-escrow-usdt" class="font-mono text-amber-300 font-medium">0.00</span>
+                <span id="bal-escrow-usdt" class="font-mono text-amber-300 font-medium"><?= number_format($ssrUsdtEscrow, 2, '.', '') ?></span>
               </div>
             </div>
           </div>
@@ -321,14 +389,43 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
                 <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                 Escrow Protected
               </span>
-              <span id="pendingTransfersCount" class="hidden">0</span>
+              <span id="pendingTransfersCount" class="<?= $ssrActivePendingCount > 0 ? 'inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold leading-none text-amber-300 bg-amber-500/20 border border-amber-500/40 rounded-full' : 'hidden' ?>"><?= $ssrActivePendingCount ?></span>
             </div>
             <div class="text-2xl font-black text-white font-mono tracking-tight mt-1 flex items-baseline gap-2 flex-wrap" id="totalEscrowShielded">
-              0.0000 SOL
+              <?php if ($ssrActiveSolEscrow > 0 && $ssrActiveStablesEscrow > 0): ?>
+                <span class="font-mono text-white text-2xl font-black"><?= number_format($ssrActiveSolEscrow, 4, '.', '') ?></span>
+                <span class="text-xs font-bold text-amber-400 font-sans tracking-normal ml-1">SOL</span>
+                <span class="text-slate-400 text-sm font-sans mx-2">+</span>
+                <span class="font-mono text-emerald-400 text-2xl font-black">$<?= number_format($ssrActiveStablesEscrow, 2, '.', '') ?></span>
+              <?php elseif ($ssrActiveSolEscrow > 0): ?>
+                <span class="font-mono text-white text-3xl font-black tracking-tight"><?= number_format($ssrActiveSolEscrow, 4, '.', '') ?></span>
+                <span class="text-sm font-bold text-amber-400 font-sans tracking-normal ml-1.5">SOL</span>
+              <?php elseif ($ssrActiveStablesEscrow > 0): ?>
+                <span class="font-mono text-emerald-400 text-3xl font-black tracking-tight">$<?= number_format($ssrActiveStablesEscrow, 2, '.', '') ?></span>
+                <span class="text-xs font-bold text-slate-300 font-sans ml-1.5"><?= ($ssrActiveUsdcEscrow > 0 && $ssrActiveUsdtEscrow > 0) ? 'USDC + USDT' : ($ssrActiveUsdcEscrow > 0 ? 'USDC' : 'USDT') ?></span>
+              <?php else: ?>
+                <span class="font-mono text-slate-400 text-2xl font-black">0.0000 SOL</span>
+              <?php endif; ?>
             </div>
-            <div id="escrowBreakdownBadges" class="flex items-center gap-1.5 mt-2 flex-wrap"></div>
+            <div id="escrowBreakdownBadges" class="flex items-center gap-1.5 mt-2 flex-wrap">
+              <?php if ($ssrActiveSolEscrow > 0): ?>
+                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                  <span class="w-1.5 h-1.5 rounded-full bg-purple-400"></span> <?= number_format($ssrActiveSolEscrow, 4, '.', '') ?> SOL (≈$<?= number_format($ssrActiveSolEscrow * $ssrSolPrice, 2) ?>)
+                </span>
+              <?php endif; ?>
+              <?php if ($ssrActiveUsdcEscrow > 0): ?>
+                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-blue-500/15 text-blue-300 border border-blue-500/30">
+                  <span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span> $<?= number_format($ssrActiveUsdcEscrow, 2, '.', '') ?> USDC
+                </span>
+              <?php endif; ?>
+              <?php if ($ssrActiveUsdtEscrow > 0): ?>
+                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> $<?= number_format($ssrActiveUsdtEscrow, 2, '.', '') ?> USDT
+                </span>
+              <?php endif; ?>
+            </div>
             <p class="text-[11px] text-slate-300 mt-2 leading-relaxed" id="escrowProtectedSubtext">
-              Funds in the undo window can be revoked instantly before the countdown elapses.
+              <?= $ssrActivePendingCount > 0 ? "{$ssrActivePendingCount} active hold" . ($ssrActivePendingCount > 1 ? 's' : '') . " in undo window. Revocable instantly before countdown elapses." : "Funds in the undo window can be revoked instantly before the countdown elapses." ?>
             </p>
           </div>
 
@@ -488,17 +585,17 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
                   </div>
                 </div>
 
-                <!-- Dynamic Threshold & Undo Notice Card -->
-                <div id="transferNoticeBox" class="rounded-xl p-3 bg-slate-800/60 border border-white/5 text-slate-400 text-xs flex items-start gap-2.5">
+                <!-- Dynamic Threshold & Fee Breakdown Card -->
+                <div id="transferNoticeBox" class="rounded-xl p-3.5 bg-slate-800/60 border border-white/5 text-slate-400 text-xs">
                   <div id="transferNoticeText">
                     <strong>ℹ️ Small Transfer Protection:</strong> Transfers up to 2.0 SOL are held in a 10-minute escrow window before broadcasting.
                   </div>
                 </div>
 
-                <!-- Fee & Network info -->
-                <div class="pt-1 flex items-center justify-between text-[11px] text-slate-500">
-                  <span>Platform Fee: <strong class="text-slate-300">0.00 SOL</strong></span>
-                  <span>Solana Rent & Gas: <strong class="text-emerald-400">Sponsored</strong></span>
+                <!-- Live Fee & Gas Status Footer -->
+                <div class="pt-1 flex items-center justify-between text-[11px] text-slate-400">
+                  <span id="transferPlatformFeeFooter">Platform Fee (12%): <strong id="transferPlatformFeeFooterVal" class="text-amber-400 font-mono">+0.0000 SOL</strong></span>
+                  <span id="transferGasFeeFooter">Network Gas: <strong id="transferGasFeeFooterVal" class="text-slate-300 font-mono">0.000005 SOL</strong></span>
                 </div>
 
                 <!-- Submit Button -->
@@ -1328,6 +1425,22 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
 
   <!-- Core JavaScript modules with automatic cache busting -->
   <script src="/assets/js/wallet.js?v=<?= file_exists(__DIR__ . '/assets/js/wallet.js') ? filemtime(__DIR__ . '/assets/js/wallet.js') : '1.1' ?>"></script>
+  <script>
+    window.__INITIAL_STATE__ = <?= json_encode([
+      'user' => [
+        'id' => $userId,
+        'username' => $_SESSION['username'] ?? 'User',
+        'email' => $_SESSION['email'] ?? '',
+        'solana_deposit_address' => $_SESSION['solana_deposit_address'] ?? '',
+        'two_factor_enabled' => (int) ($_SESSION['two_factor_enabled'] ?? 0),
+        'is_admin' => $isAdmin
+      ],
+      'balances' => $ssrBalances,
+      'pendingTransfers' => $ssrPending,
+      'historyTransfers' => $ssrHistory,
+      'settings' => $ssrSettings
+    ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+  </script>
   <script src="/assets/js/dashboard.js?v=<?= file_exists(__DIR__ . '/assets/js/dashboard.js') ? filemtime(__DIR__ . '/assets/js/dashboard.js') : '1.1' ?>"></script>
 
   <!-- PWA Service Worker Registration -->

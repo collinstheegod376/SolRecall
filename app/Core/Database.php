@@ -84,13 +84,6 @@ class Database
     private function connect(): void
     {
         $driver = $this->config['driver'] ?? 'pgsql';
-        $host = $this->config['host'] ?? 'aws-0-eu-west-1.pooler.supabase.com';
-        $port = (int) ($this->config['port'] ?? 6543);
-        $database = $this->config['database'] ?? 'postgres';
-        $username = $this->config['username'] ?? 'postgres.ouwxjoqredxaacdqmsht';
-        $password = $this->config['password'] ?? '';
-        $sslmode = $this->config['sslmode'] ?? 'require';
-
         $options = $this->config['options'] ?? [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -100,6 +93,19 @@ class Database
             PDO::ATTR_EMULATE_PREPARES => true,
             PDO::ATTR_STRINGIFY_FETCHES => false,
         ];
+
+        if ($driver === 'sqlite') {
+            $database = $this->config['database'] ?? ':memory:';
+            $this->pdo = new PDO("sqlite:{$database}", null, null, $options);
+            return;
+        }
+
+        $host = $this->config['host'] ?? 'aws-0-eu-west-1.pooler.supabase.com';
+        $port = (int) ($this->config['port'] ?? 6543);
+        $database = $this->config['database'] ?? 'postgres';
+        $username = $this->config['username'] ?? 'postgres.ouwxjoqredxaacdqmsht';
+        $password = $this->config['password'] ?? '';
+        $sslmode = $this->config['sslmode'] ?? 'require';
 
         // Format PostgreSQL DSN for Supabase
         $dsn = "pgsql:host={$host};port={$port};dbname={$database};sslmode={$sslmode}";
@@ -284,7 +290,7 @@ class Database
      */
     public function selectForUpdate(string $sql, array $params = []): ?array
     {
-        if (!str_contains(strtoupper($sql), 'FOR UPDATE')) {
+        if (($this->config['driver'] ?? 'pgsql') !== 'sqlite' && !str_contains(strtoupper($sql), 'FOR UPDATE')) {
             $sql = rtrim($sql, ';') . ' FOR UPDATE';
         }
         return $this->fetch($sql, $params);
@@ -296,7 +302,7 @@ class Database
      */
     public function selectAllForUpdate(string $sql, array $params = []): array
     {
-        if (!str_contains(strtoupper($sql), 'FOR UPDATE')) {
+        if (($this->config['driver'] ?? 'pgsql') !== 'sqlite' && !str_contains(strtoupper($sql), 'FOR UPDATE')) {
             $sql = rtrim($sql, ';') . ' FOR UPDATE';
         }
         return $this->fetchAll($sql, $params);

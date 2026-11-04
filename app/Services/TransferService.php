@@ -120,40 +120,108 @@ class TransferService
         $windowMinutes = max($minWindow, min($maxWindow, $windowMinutes));
 
         // 2. Small Transfer -> Escrow Hold
-        if ($isSmall) {
-            return $this->db->transaction(function (Database $db) use ($userId, $token, $amount, $destination, $note, $windowMinutes) {
-                // Atomic balance row lock
-                $balanceRow = $db->selectForUpdate(
-                    'SELECT available, escrow FROM user_balances WHERE user_id = ? AND token = ?',
-                    [$userId, $token]
-                );
+        $platformFee = round($amount * 0.12, 6);
+        $gasFee = 0.000005; // standard Solana tx fee in SOL
+        $gasFeeStr = '0.000005';
 
-                if (!$balanceRow) {
-                    // Initialize empty balance row if absent
+        if ($isSmall) {
+            return $this->db->transaction(function (Database $db) use ($userId, $token, $amount, $destination, $note, $windowMinutes, $platformFee, $gasFee, $gasFeeStr) {
+                if ($token === 'SOL') {
+                    $totalRequired = round($amount + $platformFee + $gasFee, 6);
+
+                    // Atomic balance row lock
+                    $balanceRow = $db->selectForUpdate(
+                        'SELECT available, escrow FROM user_balances WHERE user_id = ? AND token = ?',
+                        [$userId, 'SOL']
+                    );
+
+                    if (!$balanceRow) {
+                        // Initialize empty balance row if absent
+                        $db->execute(
+                            'INSERT INTO user_balances (user_id, token, available, escrow) VALUES (?, ?, 0, 0)',
+                            [$userId, 'SOL']
+                        );
+                        $balanceRow = ['available' => 0.0, 'escrow' => 0.0];
+                    }
+
+                    $available = (float) $balanceRow['available'];
+                    if ($available < $totalRequired) {
+                        throw new ValidationException(
+                            "Requires {$amount} SOL + {$platformFee} SOL (12% platform fee) + {$gasFeeStr} SOL (network gas) = {$totalRequired} SOL. Available: {$available} SOL",
+                            ['amount' => 'Insufficient funds']
+                        );
+                    }
+
+                    // Calculate expiration timestamp
+                    $expiresTimestamp = time() + ($windowMinutes * 60);
+                    $expiresAt = date('Y-m-d H:i:s', $expiresTimestamp);
+
+                    // Atomic balance update: decrement available by totalRequired, increment escrow by principal amount
                     $db->execute(
-                        'INSERT INTO user_balances (user_id, token, available, escrow) VALUES (?, ?, 0, 0)',
+                        'UPDATE user_balances SET available = available - ?, escrow = escrow + ? WHERE user_id = ? AND token = ?',
+                        [$totalRequired, $amount, $userId, 'SOL']
+                    );
+                } else {
+                    $totalRequiredToken = round($amount + $platformFee, 6);
+
+                    // Lock token balance row
+                    $balanceRow = $db->selectForUpdate(
+                        'SELECT available, escrow FROM user_balances WHERE user_id = ? AND token = ?',
                         [$userId, $token]
                     );
-                    $balanceRow = ['available' => 0.0, 'escrow' => 0.0];
-                }
 
-                $available = (float) $balanceRow['available'];
-                if ($available < $amount) {
-                    throw new ValidationException(
-                        "Insufficient available {$token} balance. Required: {$amount}, Available: {$available}",
-                        ['amount' => 'Insufficient funds']
+                    if (!$balanceRow) {
+                        $db->execute(
+                            'INSERT INTO user_balances (user_id, token, available, escrow) VALUES (?, ?, 0, 0)',
+                            [$userId, $token]
+                        );
+                        $balanceRow = ['available' => 0.0, 'escrow' => 0.0];
+                    }
+
+                    $available = (float) $balanceRow['available'];
+                    if ($available < $totalRequiredToken) {
+                        throw new ValidationException(
+                            "Requires {$amount} {$token} + {$platformFee} {$token} (12% platform fee) = {$totalRequiredToken} {$token}. Available: {$available} {$token}",
+                            ['amount' => 'Insufficient funds']
+                        );
+                    }
+
+                    // Check user also has at least $gasFee (0.000005 SOL) in their SOL balance for Solana network gas!
+                    $solBalanceRow = $db->selectForUpdate(
+                        'SELECT available, escrow FROM user_balances WHERE user_id = ? AND token = ?',
+                        [$userId, 'SOL']
+                    );
+                    if (!$solBalanceRow) {
+                        $db->execute(
+                            'INSERT INTO user_balances (user_id, token, available, escrow) VALUES (?, ?, 0, 0)',
+                            [$userId, 'SOL']
+                        );
+                        $solBalanceRow = ['available' => 0.0, 'escrow' => 0.0];
+                    }
+                    $solAvailable = (float) $solBalanceRow['available'];
+                    if ($solAvailable < $gasFee) {
+                        throw new ValidationException(
+                            "Insufficient SOL balance for network gas. Requires {$gasFeeStr} SOL for Solana transaction fee. Available SOL: {$solAvailable}",
+                            ['gas' => 'Insufficient SOL for gas fee']
+                        );
+                    }
+
+                    // Calculate expiration timestamp
+                    $expiresTimestamp = time() + ($windowMinutes * 60);
+                    $expiresAt = date('Y-m-d H:i:s', $expiresTimestamp);
+
+                    // Decrement token available by $amount + $platformFee, increment token escrow by $amount
+                    $db->execute(
+                        'UPDATE user_balances SET available = available - ?, escrow = escrow + ? WHERE user_id = ? AND token = ?',
+                        [$totalRequiredToken, $amount, $userId, $token]
+                    );
+
+                    // Decrement SOL available by $gasFee
+                    $db->execute(
+                        'UPDATE user_balances SET available = available - ? WHERE user_id = ? AND token = ?',
+                        [$gasFee, $userId, 'SOL']
                     );
                 }
-
-                // Calculate expiration timestamp
-                $expiresTimestamp = time() + ($windowMinutes * 60);
-                $expiresAt = date('Y-m-d H:i:s', $expiresTimestamp);
-
-                // Atomic balance update: decrement available, increment escrow
-                $db->execute(
-                    'UPDATE user_balances SET available = available - ?, escrow = escrow + ? WHERE user_id = ? AND token = ?',
-                    [$amount, $amount, $userId, $token]
-                );
 
                 // Insert pending transfer record with RETURNING id
                 $transferId = (int) $db->fetchColumn(
@@ -162,6 +230,7 @@ class TransferService
                     [$userId, $token, $amount, $destination, $note, $expiresAt]
                 );
                 $humanDuration = self::formatHumanDuration($windowMinutes);
+                $totalDeducted = ($token === 'SOL') ? round($amount + $platformFee + $gasFee, 6) : round($amount + $platformFee, 6);
 
                 return [
                     'success' => true,
@@ -170,6 +239,9 @@ class TransferService
                     'transfer_id' => $transferId,
                     'token' => $token,
                     'amount' => $amount,
+                    'platform_fee' => $platformFee,
+                    'gas_fee' => $gasFee,
+                    'total_deducted' => $totalDeducted,
                     'destination' => $destination,
                     'note' => $note,
                     'window_minutes' => $windowMinutes,
@@ -227,6 +299,8 @@ class TransferService
 
             $token = (string) $transfer['token'];
             $amount = (float) $transfer['amount'];
+            $platformFee = round($amount * 0.12, 6);
+            $gasFee = 0.000005;
 
             // Lock balance row
             $balance = $db->selectForUpdate(
@@ -257,11 +331,24 @@ class TransferService
                 );
             }
 
-            // Atomic claim won! Safe to reverse escrow balance back into available
-            $db->execute(
-                'UPDATE user_balances SET escrow = escrow - ?, available = available + ? WHERE user_id = ? AND token = ?',
-                [$amount, $amount, (int) $transfer['user_id'], $token]
-            );
+            // Atomic claim won! Safe to reverse escrow balance and platform fee back into available balance
+            if ($token === 'SOL') {
+                $totalRefund = round($amount + $platformFee + $gasFee, 6);
+                $db->execute(
+                    'UPDATE user_balances SET escrow = escrow - ?, available = available + ? WHERE user_id = ? AND token = ?',
+                    [$amount, $totalRefund, (int) $transfer['user_id'], 'SOL']
+                );
+            } else {
+                $totalRefundToken = round($amount + $platformFee, 6);
+                $db->execute(
+                    'UPDATE user_balances SET escrow = escrow - ?, available = available + ? WHERE user_id = ? AND token = ?',
+                    [$amount, $totalRefundToken, (int) $transfer['user_id'], $token]
+                );
+                $db->execute(
+                    'UPDATE user_balances SET available = available + ? WHERE user_id = ? AND token = ?',
+                    [$gasFee, (int) $transfer['user_id'], 'SOL']
+                );
+            }
 
             return [
                 'success' => true,
@@ -269,6 +356,8 @@ class TransferService
                 'status' => 'cancelled',
                 'token' => $token,
                 'refunded_amount' => $amount,
+                'platform_fee_refunded' => $platformFee,
+                'gas_fee_refunded' => $gasFee,
                 'cancelled_at' => $now,
                 'message' => "Transfer #{$transferId} successfully cancelled. {$amount} {$token} restored to available balance.",
             ];
@@ -285,26 +374,68 @@ class TransferService
         string $destination,
         ?string $note
     ): array {
-        // Step 1: Atomically lock and deduct available balance
-        $transferId = $this->db->transaction(function (Database $db) use ($userId, $token, $amount, $destination, $note) {
-            $balanceRow = $db->selectForUpdate(
-                'SELECT available FROM user_balances WHERE user_id = ? AND token = ?',
-                [$userId, $token]
-            );
+        $platformFee = round($amount * 0.12, 6);
+        $gasFee = 0.000005;
+        $gasFeeStr = '0.000005';
 
-            $available = (float) ($balanceRow['available'] ?? 0);
-            if ($available < $amount) {
-                throw new ValidationException(
-                    "Insufficient available {$token} balance. Required: {$amount}, Available: {$available}",
-                    ['amount' => 'Insufficient funds']
+        // Step 1: Atomically lock and deduct available balance
+        $transferId = $this->db->transaction(function (Database $db) use ($userId, $token, $amount, $destination, $note, $platformFee, $gasFee, $gasFeeStr) {
+            if ($token === 'SOL') {
+                $totalRequired = round($amount + $platformFee + $gasFee, 6);
+                $balanceRow = $db->selectForUpdate(
+                    'SELECT available FROM user_balances WHERE user_id = ? AND token = ?',
+                    [$userId, 'SOL']
+                );
+
+                $available = (float) ($balanceRow['available'] ?? 0);
+                if ($available < $totalRequired) {
+                    throw new ValidationException(
+                        "Requires {$amount} SOL + {$platformFee} SOL (12% platform fee) + {$gasFeeStr} SOL (network gas) = {$totalRequired} SOL. Available: {$available} SOL",
+                        ['amount' => 'Insufficient funds']
+                    );
+                }
+
+                // Deduct available
+                $db->execute(
+                    'UPDATE user_balances SET available = available - ? WHERE user_id = ? AND token = ?',
+                    [$totalRequired, $userId, 'SOL']
+                );
+            } else {
+                $totalRequiredToken = round($amount + $platformFee, 6);
+                $balanceRow = $db->selectForUpdate(
+                    'SELECT available FROM user_balances WHERE user_id = ? AND token = ?',
+                    [$userId, $token]
+                );
+
+                $available = (float) ($balanceRow['available'] ?? 0);
+                if ($available < $totalRequiredToken) {
+                    throw new ValidationException(
+                        "Requires {$amount} {$token} + {$platformFee} {$token} (12% platform fee) = {$totalRequiredToken} {$token}. Available: {$available} {$token}",
+                        ['amount' => 'Insufficient funds']
+                    );
+                }
+
+                $solBalanceRow = $db->selectForUpdate(
+                    'SELECT available FROM user_balances WHERE user_id = ? AND token = ?',
+                    [$userId, 'SOL']
+                );
+                $solAvailable = (float) ($solBalanceRow['available'] ?? 0);
+                if ($solAvailable < $gasFee) {
+                    throw new ValidationException(
+                        "Insufficient SOL balance for network gas. Requires {$gasFeeStr} SOL for Solana transaction fee. Available SOL: {$solAvailable}",
+                        ['gas' => 'Insufficient SOL for gas fee']
+                    );
+                }
+
+                $db->execute(
+                    'UPDATE user_balances SET available = available - ? WHERE user_id = ? AND token = ?',
+                    [$totalRequiredToken, $userId, $token]
+                );
+                $db->execute(
+                    'UPDATE user_balances SET available = available - ? WHERE user_id = ? AND token = ?',
+                    [$gasFee, $userId, 'SOL']
                 );
             }
-
-            // Deduct available
-            $db->execute(
-                'UPDATE user_balances SET available = available - ? WHERE user_id = ? AND token = ?',
-                [$amount, $userId, $token]
-            );
 
             $now = date('Y-m-d H:i:s');
 
@@ -336,18 +467,33 @@ class TransferService
                 'transfer_id' => $transferId,
                 'token' => $token,
                 'amount' => $amount,
+                'platform_fee' => $platformFee,
+                'gas_fee' => $gasFee,
                 'destination' => $destination,
                 'tx_signature' => $txSig,
                 'message' => "Transfer of {$amount} {$token} broadcast directly on-chain.",
             ];
         } catch (\Throwable $e) {
             // Revert balance on failure
-            $this->db->transaction(function (Database $db) use ($userId, $token, $amount, $transferId, $e) {
+            $this->db->transaction(function (Database $db) use ($userId, $token, $amount, $transferId, $e, $platformFee, $gasFee) {
                 $failedAt = date('Y-m-d H:i:s');
-                $db->execute(
-                    'UPDATE user_balances SET available = available + ? WHERE user_id = ? AND token = ?',
-                    [$amount, $userId, $token]
-                );
+                if ($token === 'SOL') {
+                    $totalRevert = round($amount + $platformFee + $gasFee, 6);
+                    $db->execute(
+                        'UPDATE user_balances SET available = available + ? WHERE user_id = ? AND token = ?',
+                        [$totalRevert, $userId, 'SOL']
+                    );
+                } else {
+                    $totalRevertToken = round($amount + $platformFee, 6);
+                    $db->execute(
+                        'UPDATE user_balances SET available = available + ? WHERE user_id = ? AND token = ?',
+                        [$totalRevertToken, $userId, $token]
+                    );
+                    $db->execute(
+                        'UPDATE user_balances SET available = available + ? WHERE user_id = ? AND token = ?',
+                        [$gasFee, $userId, 'SOL']
+                    );
+                }
                 $db->execute(
                     "UPDATE pending_transfers SET status = 'failed', failure_reason = ?, processed_at = ? WHERE id = ?",
                     [$e->getMessage(), $failedAt, $transferId]
@@ -703,12 +849,12 @@ class TransferService
     }
 
     /**
-     * Retrieve transfer history (completed, cancelled, failed).
+     * Retrieve transfer history (pending escrow, completed, cancelled, failed, processing).
      */
     public function getTransferHistory(int $userId, int $limit = 50, int $offset = 0): array
     {
         $sql = "SELECT * FROM pending_transfers 
-                WHERE user_id = ? AND status IN ('completed', 'cancelled', 'failed') 
+                WHERE user_id = ? AND status IN ('pending', 'processing', 'completed', 'cancelled', 'failed') 
                 ORDER BY created_at DESC 
                 LIMIT ? OFFSET ?";
 
@@ -716,6 +862,8 @@ class TransferService
 
         return array_map(function ($row) {
             $row['amount'] = (float) $row['amount'];
+            $row['platform_fee'] = round($row['amount'] * 0.12, 6);
+            $row['gas_fee'] = 0.000005;
             return $row;
         }, $rows);
     }

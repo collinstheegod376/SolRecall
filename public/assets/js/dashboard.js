@@ -799,18 +799,84 @@
       const windowMins = getSelectedWindowMinutes();
       const humanWin = formatHumanDuration(windowMins);
 
+      // Fee Calculations: 12% Platform Fee & 0.000005 SOL Network Gas
+      const fee12 = amount * 0.12;
+      const gasSol = 0.000005;
+
+      const feeFormatted = token === 'SOL' ? fee12.toFixed(4) : fee12.toFixed(2);
+      const amountFormatted = token === 'SOL' ? amount.toFixed(4) : amount.toFixed(2);
+
+      let totalDebitedFormatted = '';
+      if (token === 'SOL') {
+        const totalSol = amount + fee12 + gasSol;
+        totalDebitedFormatted = `${totalSol.toFixed(6).replace(/0+$/, '').replace(/\.$/, '')} SOL`;
+      } else {
+        totalDebitedFormatted = `${(amount + fee12).toFixed(2)} ${token} + 0.000005 SOL`;
+      }
+
       if (noticeBox && noticeText) {
         noticeBox.classList.remove('hidden');
-        if (amount > 0 && amount <= threshold) {
-          noticeBox.className = 'rounded-xl p-3 bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-2.5';
-          noticeText.innerHTML = `<strong>🛡️ Protected by ${humanWin} Escrow Hold:</strong> Transfer is held in escrow. You can review or cancel anytime before the timer runs out.`;
-        } else if (amount > threshold) {
-          noticeBox.className = 'rounded-xl p-3 bg-purple-500/10 border border-purple-500/30 text-purple-200 text-xs flex items-start gap-2.5';
-          noticeText.innerHTML = `<strong>⚡ Instant Broadcast:</strong> Transfer amount (${amount} ${token}) exceeds the small transfer threshold of ${threshold} ${token}. Will be broadcast immediately on Solana.`;
+
+        if (amount > 0) {
+          const isEscrow = amount <= threshold;
+          noticeBox.className = isEscrow
+            ? 'rounded-2xl p-4 bg-gradient-to-br from-amber-500/10 via-slate-900/60 to-purple-600/10 border border-amber-500/30 text-xs shadow-lg'
+            : 'rounded-2xl p-4 bg-purple-500/10 border border-purple-500/30 text-xs shadow-lg';
+
+          const protectionBadge = isEscrow
+            ? `<div class="flex items-center gap-2 text-amber-300 font-bold mb-2 pb-2 border-b border-amber-500/20">
+                <svg class="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                <span>🛡️ Protected by ${humanWin} Escrow Hold</span>
+               </div>`
+            : `<div class="flex items-center gap-2 text-purple-300 font-bold mb-2 pb-2 border-b border-purple-500/20">
+                <svg class="w-4 h-4 text-purple-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                <span>⚡ Instant On-Chain Broadcast (&gt; ${threshold} ${token})</span>
+               </div>`;
+
+          noticeText.innerHTML = `
+            ${protectionBadge}
+            <div class="space-y-1.5 pt-0.5">
+              <div class="flex justify-between items-center text-slate-300">
+                <span class="text-slate-400">Platform Fee (12%):</span>
+                <span class="font-mono text-amber-300 font-medium">+${feeFormatted} ${token} <span class="text-slate-400 text-[10px]">(deducted from remaining balance)</span></span>
+              </div>
+              <div class="flex justify-between items-center text-slate-300">
+                <span class="text-slate-400">Network Gas:</span>
+                <span class="font-mono text-slate-200">0.000005 SOL <span class="text-slate-400 text-[10px]">(Estimated Solana tx fee)</span></span>
+              </div>
+              <div class="flex justify-between items-center text-slate-300">
+                <span class="text-slate-400">Recipient Receives:</span>
+                <span class="font-mono font-bold text-emerald-400">${amountFormatted} ${token}</span>
+              </div>
+              <div class="flex justify-between items-center pt-2 mt-1 border-t border-white/10 text-xs font-bold text-white">
+                <span>Total Debited:</span>
+                <span class="font-mono text-purple-300">${totalDebitedFormatted}</span>
+              </div>
+            </div>
+          `;
         } else {
-          noticeBox.className = 'rounded-xl p-3 bg-slate-800/60 border border-white/5 text-slate-400 text-xs flex items-start gap-2.5';
-          noticeText.innerHTML = `<strong>ℹ️ Small Transfer Protection:</strong> Transfers up to ${threshold} ${token} are held in a ${humanWin} escrow window before broadcasting.`;
+          noticeBox.className = 'rounded-xl p-3.5 bg-slate-800/60 border border-white/5 text-slate-400 text-xs flex items-start gap-2.5';
+          noticeText.innerHTML = `
+            <div class="flex items-start gap-2">
+              <span class="text-purple-400 mt-0.5">ℹ️</span>
+              <div>
+                <strong>Small Transfer Protection:</strong> Transfers up to ${threshold} ${token} are held in a ${humanWin} escrow window. 12% platform fee & 0.000005 SOL Solana network gas fee are calculated live and deducted from your remaining balance, not docked from recipient.
+              </div>
+            </div>
+          `;
         }
+      }
+
+      // Update live fee & network status footer
+      const feeFooterVal = document.getElementById('transferPlatformFeeFooterVal');
+      const gasFooterVal = document.getElementById('transferGasFeeFooterVal');
+      if (feeFooterVal) {
+        feeFooterVal.textContent = amount > 0 
+          ? `+${feeFormatted} ${token}` 
+          : `+0.0000 ${token}`;
+      }
+      if (gasFooterVal) {
+        gasFooterVal.textContent = '0.000005 SOL';
       }
 
       // Update available hint text
@@ -849,27 +915,46 @@
     if (customVal) customVal.addEventListener('input', updateNotice);
     if (customUnit) customUnit.addEventListener('change', updateNotice);
 
-    // MAX button
+    // MAX button: Solves for amount + 12% fee + gas <= avail
     if (maxBtn) {
       maxBtn.addEventListener('click', () => {
         const token = tokenSelect ? tokenSelect.value : 'SOL';
         const avail = AppState.balances[token] ? AppState.balances[token].available : 0;
-        if (amountInput) {
-          amountInput.value = avail > 0 ? avail : '';
-          updateNotice();
+        let maxAmount = 0;
+        if (token === 'SOL') {
+          maxAmount = Math.max(0, (avail - 0.000005) / 1.12);
+          maxAmount = Math.floor(maxAmount * 10000) / 10000;
+          if (amountInput) amountInput.value = maxAmount > 0 ? maxAmount.toFixed(4) : '';
+        } else {
+          maxAmount = Math.max(0, avail / 1.12);
+          maxAmount = Math.floor(maxAmount * 100) / 100;
+          if (amountInput) amountInput.value = maxAmount > 0 ? maxAmount.toFixed(2) : '';
         }
+        updateNotice();
       });
     }
 
-    // Percentage buttons (25%, 50%, 75%, 100%)
+    // Percentage buttons (25%, 50%, 100%)
     percentBtns.forEach(btn => {
       btn.addEventListener('click', () => {
         const pct = parseFloat(btn.dataset.percent) || 100;
         const token = tokenSelect ? tokenSelect.value : 'SOL';
         const avail = AppState.balances[token] ? AppState.balances[token].available : 0;
-        const calc = (avail * (pct / 100));
+        let baseMax = 0;
+        if (token === 'SOL') {
+          baseMax = Math.max(0, (avail - 0.000005) / 1.12);
+        } else {
+          baseMax = Math.max(0, avail / 1.12);
+        }
+        const calc = baseMax * (pct / 100);
         if (amountInput) {
-          amountInput.value = token === 'SOL' ? calc.toFixed(4) : calc.toFixed(2);
+          if (token === 'SOL') {
+            const val = Math.floor(calc * 10000) / 10000;
+            amountInput.value = val > 0 ? val.toFixed(4) : '';
+          } else {
+            const val = Math.floor(calc * 100) / 100;
+            amountInput.value = val > 0 ? val.toFixed(2) : '';
+          }
           updateNotice();
         }
       });
@@ -902,10 +987,31 @@
         amountInput.focus();
         return;
       }
+
+      // Balance & Non-sponsored Gas Validation
       const avail = AppState.balances[token] ? AppState.balances[token].available : 0;
-      if (amount > avail) {
-        showToast(`Insufficient ${token} balance (Available: ${formatAmount(avail)} ${token})`, 'error');
-        return;
+      const fee12 = amount * 0.12;
+      const gasSol = 0.000005;
+
+      if (token === 'SOL') {
+        const requiredSol = amount + fee12 + gasSol;
+        if (avail < requiredSol) {
+          showToast(`Insufficient SOL balance. Required: ${requiredSol.toFixed(6)} SOL (Amount: ${amount.toFixed(4)} + 12% fee: ${fee12.toFixed(4)} + Gas: 0.000005 SOL). Available: ${formatAmount(avail, 4)} SOL`, 'error');
+          amountInput.focus();
+          return;
+        }
+      } else {
+        const requiredToken = amount + fee12;
+        const solAvail = AppState.balances.SOL ? AppState.balances.SOL.available : 0;
+        if (avail < requiredToken) {
+          showToast(`Insufficient ${token} balance. Required: ${requiredToken.toFixed(2)} ${token} (Amount: ${amount.toFixed(2)} + 12% fee: ${fee12.toFixed(2)}). Available: ${formatAmount(avail, 2)} ${token}`, 'error');
+          amountInput.focus();
+          return;
+        }
+        if (solAvail < gasSol) {
+          showToast(`Insufficient SOL balance for Solana network gas. Required: 0.000005 SOL. Available: ${formatAmount(solAvail, 4)} SOL`, 'error');
+          return;
+        }
       }
 
       // Button loading state & Full-fidelity loading modal
@@ -923,39 +1029,100 @@
         });
 
         if (res.success) {
+          const payload = res.data || res;
+          const transferId = payload.transfer_id || payload.id || Date.now();
+          const expiresAt = payload.expires_at || new Date(Date.now() + windowMinutes * 60 * 1000).toISOString();
+          const totalSeconds = (windowMinutes * 60);
+
+          // 1. Construct new transfer item immediately from response data
+          const newTransfer = {
+            id: transferId,
+            user_id: AppState.user ? AppState.user.id : null,
+            token: token,
+            amount: amount,
+            destination: destination,
+            note: note || '',
+            expires_at: expiresAt,
+            status: 'pending',
+            seconds_remaining: totalSeconds,
+            total_seconds: totalSeconds,
+            _expiresMs: Date.now() + (totalSeconds * 1000),
+            created_at: new Date().toISOString()
+          };
+
+          // 2. Optimistically unshift into AppState.pendingTransfers
+          AppState.pendingTransfers = AppState.pendingTransfers.filter(t => t.id !== transferId);
+          AppState.pendingTransfers.unshift(newTransfer);
+
+          // 3. Optimistically deduct transfer amount + 12% fee (+ gas) from AppState.balances and add amount to escrow
+          if (AppState.balances[token]) {
+            if (token === 'SOL') {
+              AppState.balances.SOL.available = Math.max(0, AppState.balances.SOL.available - (amount + fee12 + gasSol));
+              AppState.balances.SOL.escrow = (AppState.balances.SOL.escrow || 0) + amount;
+            } else {
+              AppState.balances[token].available = Math.max(0, AppState.balances[token].available - (amount + fee12));
+              AppState.balances[token].escrow = (AppState.balances[token].escrow || 0) + amount;
+              if (AppState.balances.SOL) {
+                AppState.balances.SOL.available = Math.max(0, AppState.balances.SOL.available - gasSol);
+              }
+            }
+          }
+
+          // Prepend optimistically to historyTransfers as well
+          if (Array.isArray(AppState.historyTransfers)) {
+            AppState.historyTransfers = AppState.historyTransfers.filter(t => t.id !== transferId);
+            AppState.historyTransfers.unshift({ ...newTransfer });
+          }
+
+          // 4. Immediately render in memory!
+          renderHeaderAndBalances();
+          renderPendingTransfers();
+          renderHistoryTable();
+
           // Reset form inputs & notice
           form.reset();
           updateNotice();
 
-          // Transition to gorgeous Phantom-style Success Screen modal
+          // 5. Transition the modal to the Phantom Success Receipt view immediately
           showTransferSuccessReceipt(res, { token, amount, destination, windowMinutes, note });
 
-          // Reload real server state
-          try {
-            const [bRes, pRes, hRes] = await Promise.all([
-              apiFetch('/api/transfers/balances'),
-              apiFetch('/api/transfers/pending'),
-              apiFetch('/api/transfers/history')
-            ]);
-            if (bRes && bRes.success) {
-              const p = bRes.data || bRes;
-              if (p.balances) AppState.balances = p.balances;
+          // 6. Asynchronous non-blocking background sync (does NOT delay or block UI)
+          (async () => {
+            try {
+              const [bRes, pRes, hRes] = await Promise.all([
+                apiFetch('/api/transfers/balances').catch(() => null),
+                apiFetch('/api/transfers/pending').catch(() => null),
+                apiFetch('/api/transfers/history').catch(() => null)
+              ]);
+              if (bRes && bRes.success) {
+                const p = bRes.data || bRes;
+                if (p.balances) AppState.balances = p.balances;
+              }
+              if (pRes && pRes.success) {
+                const p = pRes.data || pRes;
+                const fresh = p.transfers || p.pending || [];
+                const validFresh = fresh.filter(t => t.status === 'pending' && calculateRemainingSeconds(t) > 0);
+                if (!validFresh.some(t => t.id == transferId)) {
+                  validFresh.unshift(newTransfer);
+                }
+                AppState.pendingTransfers = validFresh;
+              }
+              if (hRes && hRes.success) {
+                const p = hRes.data || hRes;
+                const freshHistory = p.transfers || p.history || [];
+                if (!freshHistory.some(t => t.id == transferId)) {
+                  freshHistory.unshift(newTransfer);
+                }
+                AppState.historyTransfers = freshHistory;
+              }
+              renderHeaderAndBalances();
+              renderPendingTransfers();
+              renderHistoryTable();
+            } catch (syncErr) {
+              console.debug('Background sync notice:', syncErr);
             }
-            if (pRes && pRes.success) {
-              const p = pRes.data || pRes;
-              const fresh = p.transfers || p.pending || [];
-              AppState.pendingTransfers = fresh.filter(t => t.status === 'pending' && calculateRemainingSeconds(t) > 0);
-            }
-            if (hRes && hRes.success) {
-              const p = hRes.data || hRes;
-              AppState.historyTransfers = p.transfers || p.history || [];
-            }
-          } catch (e) {
-            console.warn('Sync notice:', e.message);
-          }
-          renderHeaderAndBalances();
-          renderPendingTransfers();
-          renderHistoryTable();
+          })();
+
         } else {
           closeTransferReceiptModal();
           showToast(res.error || 'Failed to initiate transfer', 'error');
@@ -1003,7 +1170,7 @@
   }
   window.formatBadgeDuration = formatBadgeDuration;
 
-  // Open Full-Fidelity Loading Screen Modal
+  // Open Full-Fidelity Loading Screen Modal with smooth fade
   function openTransferLoadingModal(data = {}) {
     const modal = document.getElementById('transferReceiptModal');
     const loadingView = document.getElementById('transferReceiptLoadingView');
@@ -1019,14 +1186,27 @@
       stepEl.textContent = 'Validating timelock & reserving escrow balance...';
     }
 
-    if (modal) modal.classList.remove('hidden');
+    if (modal) {
+      modal.style.transition = 'opacity 0.25s ease';
+      modal.style.opacity = '0';
+      modal.classList.remove('hidden');
+      requestAnimationFrame(() => {
+        modal.style.opacity = '1';
+      });
+    }
   }
   window.openTransferLoadingModal = openTransferLoadingModal;
 
-  // Close Transfer Receipt Modal
+  // Close Transfer Receipt Modal with smooth CSS fade
   function closeTransferReceiptModal() {
     const modal = document.getElementById('transferReceiptModal');
-    if (modal) modal.classList.add('hidden');
+    if (!modal) return;
+    modal.style.transition = 'opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1)';
+    modal.style.opacity = '0';
+    setTimeout(() => {
+      modal.classList.add('hidden');
+      modal.style.opacity = '1';
+    }, 200);
   }
   window.closeTransferReceiptModal = closeTransferReceiptModal;
 
@@ -1145,30 +1325,34 @@
   }
   window.copyReceiptShareText = copyReceiptShareText;
 
-  // View newly created hold in Active Holds section
+  // View newly created hold in Active Holds section (Immediate transition, zero delay, glowing amber border pulse)
   function viewReceiptInActiveHolds() {
     closeTransferReceiptModal();
     if (typeof window.switchTab === 'function') {
-      window.switchTab('overview');
+      window.switchTab('overview', false);
     }
-    setTimeout(() => {
+
+    const triggerHighlight = () => {
       const holdsContainer = document.getElementById('pendingTransfersContainer') || document.getElementById('tab-content-overview');
-      if (holdsContainer) {
-        holdsContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
       if (currentReceiptData && currentReceiptData.transferId) {
         const card = document.getElementById(`pending-card-${currentReceiptData.transferId}`);
         if (card) {
-          card.classList.add('solana-border-glow', 'ring-2', 'ring-purple-500/50');
+          card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          card.classList.add('solana-border-glow', 'ring-2', 'ring-amber-400');
           setTimeout(() => {
-            card.classList.remove('solana-border-glow', 'ring-2', 'ring-purple-500/50');
-          }, 3000);
+            card.classList.remove('solana-border-glow', 'ring-2', 'ring-amber-400');
+          }, 2500);
+          return;
         }
       }
-    }, 150);
+      if (holdsContainer) {
+        holdsContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    };
+
+    requestAnimationFrame(triggerHighlight);
   }
   window.viewReceiptInActiveHolds = viewReceiptInActiveHolds;
-
 
   // Cancel Transfer Modal Handlers
   function openCancelModal(transferId) {
@@ -1266,7 +1450,7 @@
   }
   window.confirmCancelTransfer = confirmCancelTransfer;
 
-  // History Table Rendering & Filter
+  // History Table Rendering & Filter (Supports Pending Escrow, Completed, Cancelled, Failed)
   function renderHistoryTable() {
     const tbody = document.getElementById('historyTableBody');
     const emptyRow = document.getElementById('historyEmptyRow');
@@ -1275,7 +1459,39 @@
     const filter = AppState.currentHistoryFilter;
     const search = AppState.historySearchTerm.toLowerCase();
 
-    const filtered = AppState.historyTransfers.filter(item => {
+    // Consolidate history transfers and pending transfers so active escrow items are always visible
+    const transferMap = new Map();
+
+    // 1. Pending transfers (active escrow holds)
+    if (Array.isArray(AppState.pendingTransfers)) {
+      AppState.pendingTransfers.forEach(t => {
+        if (t && t.id) {
+          transferMap.set(String(t.id), { ...t, status: t.status || 'pending' });
+        }
+      });
+    }
+
+    // 2. History transfers (completed, cancelled, failed, and any synced pending)
+    if (Array.isArray(AppState.historyTransfers)) {
+      AppState.historyTransfers.forEach(t => {
+        if (t && t.id) {
+          const existing = transferMap.get(String(t.id));
+          if (existing && existing.status === 'pending' && t.status === 'pending') {
+            transferMap.set(String(t.id), { ...existing, ...t, status: 'pending' });
+          } else {
+            transferMap.set(String(t.id), t);
+          }
+        }
+      });
+    }
+
+    const allTransfers = Array.from(transferMap.values()).sort((a, b) => {
+      const dateA = new Date(a.created_at || 0).getTime();
+      const dateB = new Date(b.created_at || 0).getTime();
+      return dateB - dateA;
+    });
+
+    const filtered = allTransfers.filter(item => {
       // Filter status
       if (filter !== 'all' && item.status !== filter) return false;
       // Search
@@ -1325,13 +1541,21 @@
         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
       }) : 'Recent';
 
-      // Explorer link
+      // Explorer link: links to tx signature on Solscan if broadcast, or destination account on Solscan if pending escrow hold
       let explorerHtml = `<span class="text-slate-500 text-xs">—</span>`;
       if (t.tx_signature) {
         const explorerUrl = `https://solscan.io/tx/${t.tx_signature}?cluster=devnet`;
         explorerHtml = `
           <a href="${explorerUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 font-mono transition" title="View on Solscan">
             <span>${truncateAddress(t.tx_signature, 4, 4)}</span>
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          </a>
+        `;
+      } else if (t.status === 'pending') {
+        const explorerUrl = `https://solscan.io/account/${t.destination}?cluster=devnet`;
+        explorerHtml = `
+          <a href="${explorerUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 font-mono transition" title="View recipient address on Solscan">
+            <span>Escrow Hold</span>
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
           </a>
         `;
@@ -1853,7 +2077,7 @@
     });
   }
 
-  function switchTab(tabId) {
+  function switchTab(tabId, scrollToTop = true) {
     if (!tabId) return;
     // Hide all tab sections
     document.querySelectorAll('.dashboard-tab-content').forEach(section => {
@@ -1893,8 +2117,10 @@
       try { setupSettings(); } catch (e) { console.error('Settings tab setup error:', e); }
     }
 
-    // Scroll to top
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Scroll to top only if requested
+    if (scrollToTop) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }
   window.switchTab = switchTab;
 
@@ -1917,7 +2143,38 @@
     // 1. Setup tabs immediately so buttons are responsive right away
     try { setupTabs(); } catch (e) { console.error('setupTabs error:', e); }
 
-    // Load live user & balances from Supabase API
+    // Synchronous SSR Hydration: immediately populate state & render to eliminate zero-flicker on refresh
+    if (window.__INITIAL_STATE__) {
+      try {
+        if (window.__INITIAL_STATE__.user) {
+          AppState.user = window.__INITIAL_STATE__.user;
+        }
+        if (window.__INITIAL_STATE__.balances) {
+          AppState.balances = window.__INITIAL_STATE__.balances;
+        }
+        if (window.__INITIAL_STATE__.pendingTransfers) {
+          AppState.pendingTransfers = window.__INITIAL_STATE__.pendingTransfers || [];
+        }
+        if (window.__INITIAL_STATE__.historyTransfers) {
+          AppState.historyTransfers = window.__INITIAL_STATE__.historyTransfers || [];
+        }
+        if (window.__INITIAL_STATE__.settings) {
+          AppState.settings = window.__INITIAL_STATE__.settings || AppState.settings;
+        }
+
+        renderHeaderAndBalances();
+        renderPendingTransfers();
+        renderHistoryTable();
+
+        if (Array.isArray(AppState.pendingTransfers) && AppState.pendingTransfers.length > 0) {
+          try { startTicker(); } catch (e) { console.error('startTicker SSR error:', e); }
+        }
+      } catch (err) {
+        console.error('SSR hydration error:', err);
+      }
+    }
+
+    // Load live user & balances from API in background (revalidates without flashing zeros)
     try {
       const authRes = await apiFetch('/api/auth/me');
       if (authRes && authRes.success) {

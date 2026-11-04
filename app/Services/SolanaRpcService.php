@@ -633,83 +633,139 @@ class SolanaRpcService
         $ataProgramBinary = Base58::decode(self::ASSOCIATED_TOKEN_PROGRAM);
         $rentSysvarBinary = Base58::decode(self::SYSVAR_RENT);
 
-        // Resolve hot wallet fee payer key if omitted
-        if ($hotWalletSecretKeyBase58 === null || $hotWalletSecretKeyBase58 === '') {
-            $kms = new KeyManagementService();
-            $hotWalletSecretKeyBase58 = $kms->resolveSigningKey(null);
+        // If hot wallet secret key is provided and distinct, sponsor network fee as Account 0.
+        // Otherwise, user's custodial wallet pays its own network fee and ATA rent as Account 0.
+        if ($hotWalletSecretKeyBase58 !== null && $hotWalletSecretKeyBase58 !== '') {
+            $hotWalletSecretKeyBinary = Base58::decode($hotWalletSecretKeyBase58);
+            if (strlen($hotWalletSecretKeyBinary) !== 64) {
+                throw new InvalidArgumentException('Hot wallet secret key must be 64 bytes.');
+            }
+            $hotWalletPubkeyBinary = substr($hotWalletSecretKeyBinary, 32, 32);
+
+            // Solana Wire Account Layout:
+            // Writable Signers:
+            //   0: Hot Wallet (Fee Payer)
+            //   1: User Custodial Key (Token Authority)
+            // Writable Non-Signers:
+            //   2: Source ATA
+            //   3: Destination ATA
+            // Readonly Non-Signers:
+            //   4: Destination Owner Wallet
+            //   5: Token Mint
+            //   6: System Program
+            //   7: Token Program
+            //   8: Associated Token Program
+            //   9: Sysvar Rent
+            $header = chr(2) . chr(0) . chr(6); // 2 signers, 0 ro signers, 6 ro non-signers
+
+            $accountKeys = self::encodeCompactU16(10)
+                . $hotWalletPubkeyBinary
+                . $userPubkeyBinary
+                . $sourceAtaBinary
+                . $destAtaBinary
+                . $destOwnerBinary
+                . $mintBinary
+                . $systemProgramBinary
+                . $tokenProgramBinary
+                . $ataProgramBinary
+                . $rentSysvarBinary;
+
+            // Instruction 1: CreateAssociatedTokenAccountIdempotent
+            // Program: Associated Token Program (index 8)
+            // Accounts:
+            //   0: Funding account (index 0 - Hot Wallet)
+            //   1: Associated Token Account to create (index 3 - dest ATA)
+            //   2: Wallet Owner (index 4 - recipient)
+            //   3: Mint (index 5 - mint)
+            //   4: System Program (index 6)
+            //   5: SPL Token Program (index 7)
+            //   6: Sysvar Rent (index 9)
+            // Data: 1 byte [0x01] (CreateIdempotent)
+            $ataData = chr(1);
+            $instructionAta = chr(8)
+                . self::encodeCompactU16(7) . chr(0) . chr(3) . chr(4) . chr(5) . chr(6) . chr(7) . chr(9)
+                . self::encodeCompactU16(strlen($ataData)) . $ataData;
+
+            // Instruction 2: TokenProgram Transfer (opcode 3)
+            // Program: Token Program (index 7)
+            // Accounts:
+            //   0: Source ATA (index 2)
+            //   1: Destination ATA (index 3)
+            //   2: Authority (index 1 - User Custodial Key)
+            // Data: opcode 3 (1 byte) + uint64 amount (8 bytes little endian)
+            $transferData = chr(3) . pack('P', $rawUnits);
+            $instructionTransfer = chr(7)
+                . self::encodeCompactU16(3) . chr(2) . chr(3) . chr(1)
+                . self::encodeCompactU16(strlen($transferData)) . $transferData;
+
+            $instructions = self::encodeCompactU16(2) . $instructionAta . $instructionTransfer;
+            $message = $header . $accountKeys . $blockhashBinary . $instructions;
+
+            // Co-sign wire message:
+            $hotWalletSig = sodium_crypto_sign_detached($message, $hotWalletSecretKeyBinary);
+            $userSig = sodium_crypto_sign_detached($message, $userSecretKeyBinary);
+
+            $wireTx = self::encodeCompactU16(2) . $hotWalletSig . $userSig . $message;
+            $txSignature = Base58::encode($hotWalletSig);
+        } else {
+            // User pays own network fee and ATA rent (Single Signer layout)
+            // Accounts:
+            //   0: User Custodial Key (Fee Payer & Token Authority - Writable Signer)
+            //   1: Source ATA (Writable Non-Signer)
+            //   2: Destination ATA (Writable Non-Signer)
+            //   3: Destination Owner Wallet (Readonly Non-Signer)
+            //   4: Token Mint (Readonly Non-Signer)
+            //   5: System Program (Readonly Non-Signer)
+            //   6: Token Program (Readonly Non-Signer)
+            //   7: Associated Token Program (Readonly Non-Signer)
+            //   8: Sysvar Rent (Readonly Non-Signer)
+            $header = chr(1) . chr(0) . chr(6); // 1 signer, 0 ro signers, 6 ro non-signers
+
+            $accountKeys = self::encodeCompactU16(9)
+                . $userPubkeyBinary
+                . $sourceAtaBinary
+                . $destAtaBinary
+                . $destOwnerBinary
+                . $mintBinary
+                . $systemProgramBinary
+                . $tokenProgramBinary
+                . $ataProgramBinary
+                . $rentSysvarBinary;
+
+            // Instruction 1: CreateAssociatedTokenAccountIdempotent
+            // Program: Associated Token Program (index 7)
+            // Accounts:
+            //   0: Funding account (index 0 - User)
+            //   1: Associated Token Account to create (index 2 - dest ATA)
+            //   2: Wallet Owner (index 3 - recipient)
+            //   3: Mint (index 4 - mint)
+            //   4: System Program (index 5)
+            //   5: SPL Token Program (index 6)
+            //   6: Sysvar Rent (index 8)
+            $ataData = chr(1);
+            $instructionAta = chr(7)
+                . self::encodeCompactU16(7) . chr(0) . chr(2) . chr(3) . chr(4) . chr(5) . chr(6) . chr(8)
+                . self::encodeCompactU16(strlen($ataData)) . $ataData;
+
+            // Instruction 2: TokenProgram Transfer (opcode 3)
+            // Program: Token Program (index 6)
+            // Accounts:
+            //   0: Source ATA (index 1)
+            //   1: Destination ATA (index 2)
+            //   2: Authority (index 0 - User)
+            $transferData = chr(3) . pack('P', $rawUnits);
+            $instructionTransfer = chr(6)
+                . self::encodeCompactU16(3) . chr(1) . chr(2) . chr(0)
+                . self::encodeCompactU16(strlen($transferData)) . $transferData;
+
+            $instructions = self::encodeCompactU16(2) . $instructionAta . $instructionTransfer;
+            $message = $header . $accountKeys . $blockhashBinary . $instructions;
+
+            $userSig = sodium_crypto_sign_detached($message, $userSecretKeyBinary);
+
+            $wireTx = self::encodeCompactU16(1) . $userSig . $message;
+            $txSignature = Base58::encode($userSig);
         }
-
-        $hotWalletSecretKeyBinary = Base58::decode($hotWalletSecretKeyBase58);
-        if (strlen($hotWalletSecretKeyBinary) !== 64) {
-            throw new InvalidArgumentException('Hot wallet secret key must be 64 bytes.');
-        }
-        $hotWalletPubkeyBinary = substr($hotWalletSecretKeyBinary, 32, 32);
-
-        // Solana Wire Account Layout:
-        // Writable Signers:
-        //   0: Hot Wallet (Fee Payer)
-        //   1: User Custodial Key (Token Authority)
-        // Writable Non-Signers:
-        //   2: Source ATA
-        //   3: Destination ATA
-        // Readonly Non-Signers:
-        //   4: Destination Owner Wallet
-        //   5: Token Mint
-        //   6: System Program
-        //   7: Token Program
-        //   8: Associated Token Program
-        //   9: Sysvar Rent
-        $header = chr(2) . chr(0) . chr(6); // 2 signers, 0 ro signers, 6 ro non-signers
-
-        $accountKeys = self::encodeCompactU16(10)
-            . $hotWalletPubkeyBinary
-            . $userPubkeyBinary
-            . $sourceAtaBinary
-            . $destAtaBinary
-            . $destOwnerBinary
-            . $mintBinary
-            . $systemProgramBinary
-            . $tokenProgramBinary
-            . $ataProgramBinary
-            . $rentSysvarBinary;
-
-        // Instruction 1: CreateAssociatedTokenAccountIdempotent
-        // Program: Associated Token Program (index 8)
-        // Accounts:
-        //   0: Funding account (index 0 - Hot Wallet)
-        //   1: Associated Token Account to create (index 3 - dest ATA)
-        //   2: Wallet Owner (index 4 - recipient)
-        //   3: Mint (index 5 - mint)
-        //   4: System Program (index 6)
-        //   5: SPL Token Program (index 7)
-        //   6: Sysvar Rent (index 9)
-        // Data: 1 byte [0x01] (CreateIdempotent)
-        $ataData = chr(1);
-        $instructionAta = chr(8)
-            . self::encodeCompactU16(7) . chr(0) . chr(3) . chr(4) . chr(5) . chr(6) . chr(7) . chr(9)
-            . self::encodeCompactU16(strlen($ataData)) . $ataData;
-
-        // Instruction 2: TokenProgram Transfer (opcode 3)
-        // Program: Token Program (index 7)
-        // Accounts:
-        //   0: Source ATA (index 2)
-        //   1: Destination ATA (index 3)
-        //   2: Authority (index 1 - User Custodial Key)
-        // Data: opcode 3 (1 byte) + uint64 amount (8 bytes little endian)
-        $transferData = chr(3) . pack('P', $rawUnits);
-        $instructionTransfer = chr(7)
-            . self::encodeCompactU16(3) . chr(2) . chr(3) . chr(1)
-            . self::encodeCompactU16(strlen($transferData)) . $transferData;
-
-        $instructions = self::encodeCompactU16(2) . $instructionAta . $instructionTransfer;
-        $message = $header . $accountKeys . $blockhashBinary . $instructions;
-
-        // Co-sign wire message:
-        $hotWalletSig = sodium_crypto_sign_detached($message, $hotWalletSecretKeyBinary);
-        $userSig = sodium_crypto_sign_detached($message, $userSecretKeyBinary);
-
-        $wireTx = self::encodeCompactU16(2) . $hotWalletSig . $userSig . $message;
-        $txSignature = Base58::encode($hotWalletSig);
 
         return [
             'txBase64' => base64_encode($wireTx),
@@ -739,16 +795,11 @@ class SolanaRpcService
     ): string {
         $tokenSymbol = strtoupper(trim($tokenSymbol));
 
-        // Resolve hot wallet fee payer if configured
+        // Use hot wallet fee payer ONLY if explicitly provided and non-empty.
+        // Otherwise, user's custodial wallet pays its own network fee without platform sponsorship.
         $effectiveHotWalletKey = null;
         if ($hotWalletSecretKeyBase58 !== null && $hotWalletSecretKeyBase58 !== '') {
             $effectiveHotWalletKey = $hotWalletSecretKeyBase58;
-        } else {
-            $kms = new KeyManagementService();
-            $resolvedHot = $kms->resolveSigningKey(null);
-            if (!empty($resolvedHot)) {
-                $effectiveHotWalletKey = $resolvedHot;
-            }
         }
 
         // Verify if the hot wallet actually has on-chain SOL to sponsor network fees

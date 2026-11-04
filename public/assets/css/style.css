@@ -69,8 +69,18 @@ code, .font-mono {
   background: linear-gradient(135deg, #9945FF 0%, #14F195 100%);
 }
 
+@keyframes solanaAmberPulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 25px 4px rgba(245, 158, 11, 0.65), 0 0 0 2px rgba(245, 158, 11, 0.85);
+  }
+  50% {
+    box-shadow: 0 0 10px 1px rgba(245, 158, 11, 0.25), 0 0 0 1px rgba(245, 158, 11, 0.4);
+  }
+}
+
 .solana-border-glow {
-  box-shadow: 0 0 20px -3px rgba(153, 69, 255, 0.25);
+  box-shadow: 0 0 25px 4px rgba(245, 158, 11, 0.65);
+  animation: solanaAmberPulseGlow 1.2s ease-in-out infinite;
 }
 
 .amber-border-glow {

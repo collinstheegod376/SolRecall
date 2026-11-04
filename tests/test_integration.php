@@ -149,10 +149,11 @@ assert($smallTransferResult['status'] === 'pending');
 $smallTransferId = $smallTransferResult['transfer_id'];
 echo "[OK] Initiated escrow transfer ID #{$smallTransferId}, expires at: {$smallTransferResult['expires_at']}\n";
 
-// Verify balances: available should be 5.0 - 0.75 = 4.25, escrow should be 0.75
+// Verify balances: 12% platform fee (0.09) + 0.000005 gas fee deducted from available
+// available should be 5.0 - (0.75 + 0.09 + 0.000005) = 4.159995, escrow should be 0.75
 $balances = $transferService->getUserBalances(1);
 echo "SOL Available: {$balances['SOL']['available']}, Escrow: {$balances['SOL']['escrow']}\n";
-assert(abs($balances['SOL']['available'] - 4.25) < 0.0001);
+assert(abs($balances['SOL']['available'] - 4.159995) < 0.0001);
 assert(abs($balances['SOL']['escrow'] - 0.75) < 0.0001);
 
 // 5. Test TransferService: Cancellation Grace Window
@@ -183,10 +184,10 @@ assert($largeTransferResult['status'] === 'completed');
 assert(!empty($largeTransferResult['tx_signature']));
 echo "[OK] Large transfer executed directly on-chain! Tx Signature: {$largeTransferResult['tx_signature']}\n";
 
-// Available should now be 5.0 - 3.0 = 2.0, escrow = 0.0
+// Available should now be 5.0 - (3.0 + 0.36 + 0.000005) = 1.639995, escrow = 0.0
 $balancesAfterLarge = $transferService->getUserBalances(1);
 echo "After Large Send - SOL Available: {$balancesAfterLarge['SOL']['available']}, Escrow: {$balancesAfterLarge['SOL']['escrow']}\n";
-assert(abs($balancesAfterLarge['SOL']['available'] - 2.0) < 0.0001);
+assert(abs($balancesAfterLarge['SOL']['available'] - 1.639995) < 0.0001);
 assert(abs($balancesAfterLarge['SOL']['escrow'] - 0.0) < 0.0001);
 
 // 7. Test Multi-Year Timelock Duration & Human Formatting
@@ -270,7 +271,7 @@ $pdo->prepare("
 
 $balancesAfterDeposit = $transferService->getUserBalances(1);
 echo "After 1.5 SOL Deposit - Available: {$balancesAfterDeposit['SOL']['available']}\n";
-assert(abs($balancesAfterDeposit['SOL']['available'] - 2.5) < 0.0001); // 2.0 - 1.0 (cron completed) + 1.5 (deposit) = 2.5 SOL
+assert(abs($balancesAfterDeposit['SOL']['available'] - 2.01999) < 0.0001); // 1.639995 - 1.120005 (cron completed) + 1.5 (deposit) = 2.01999 SOL
 echo "[OK] Deposit successfully credited to user balance!\n";
 
 // 9. Test TransferController API Endpoints & Auth Enforcement
