@@ -17,8 +17,16 @@ unset($_SESSION['flash_error'], $_SESSION['flash_success']);
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Create Account • Undo Window for Solana Transfers</title>
-  <link rel="icon" type="image/jpeg" href="/logo.jpg">
+  <title>SolRecall - Reversible Time-Locked Escrow on Solana</title>
+  <link rel="icon" type="image/png" href="/assets/img/logo.png">
+  <link rel="apple-touch-icon" href="/assets/img/logo.png">
+  <!-- PWA & Mobile Meta Tags -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#07090e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SolRecall">
   <!-- Google Fonts: Inter (UI), JetBrains Mono (Addresses/Code), Space Grotesk (Wordmark) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -66,13 +74,13 @@ unset($_SESSION['flash_error'], $_SESSION['flash_success']);
       <!-- Brand Header -->
       <div class="text-center">
         <a href="/" class="inline-flex items-center justify-center gap-3 group">
-          <img src="/logo.jpg" alt="Solana Undo Logo" class="w-14 h-14 rounded-2xl shadow-xl shadow-purple-500/20 border border-purple-500/30 group-hover:scale-105 transition-transform duration-200">
+          <img src="/assets/img/logo.png" alt="SolRecall Logo" class="w-14 h-14 rounded-2xl shadow-xl shadow-purple-500/20 border border-purple-500/30 group-hover:scale-105 transition-transform duration-200 object-cover">
         </a>
         <h1 class="mt-4 text-3xl font-extrabold tracking-tight text-white">
           Create an account
         </h1>
         <p class="mt-2 text-sm text-slate-400">
-          Get your protected Solana deposit address and escrow undo window
+          Get your protected Solana deposit address and SolRecall undo window
         </p>
       </div>
 
@@ -126,7 +134,7 @@ unset($_SESSION['flash_error'], $_SESSION['flash_success']);
                    id="username"
                    name="username"
                    required
-                   placeholder="sol_trader"
+                   placeholder="Jane Doe"
                    class="w-full px-4 py-2.5 rounded-xl bg-slate-900/90 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 text-sm transition">
           </div>
 
@@ -139,7 +147,7 @@ unset($_SESSION['flash_error'], $_SESSION['flash_success']);
                    name="email"
                    required
                    autocomplete="email"
-                   placeholder="alex@domain.com"
+                   placeholder="jane@example.com"
                    class="w-full px-4 py-2.5 rounded-xl bg-slate-900/90 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 text-sm transition">
           </div>
 
@@ -187,6 +195,11 @@ unset($_SESSION['flash_error'], $_SESSION['flash_success']);
 
     </div>
   </div>
+
+  <!-- Brand Footer -->
+  <footer class="relative z-10 py-6 text-center text-xs text-slate-500">
+    SolRecall &copy; <?= date('Y') ?> &bull; Reversible Time-Locked Escrow on Solana
+  </footer>
 
   <!-- Toast Container -->
   <div id="toast-container"></div>
@@ -261,6 +274,17 @@ unset($_SESSION['flash_error'], $_SESSION['flash_success']);
         t.classList.remove('show');
         setTimeout(() => t.remove(), 300);
       }, 3500);
+    }
+  </script>
+
+  <!-- PWA Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch((err) => {
+          console.warn('[SolRecall] Service Worker registration failed:', err);
+        });
+      });
     }
   </script>
 </body>

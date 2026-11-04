@@ -367,12 +367,16 @@
       const twoFaBadge = document.getElementById('twoFaHeaderBadge');
       if (twoFaBadge) {
         twoFaBadge.innerHTML = user.two_factor_enabled
-          ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+          ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> 2FA Secured
              </span>`
-          : `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/30">
+          : `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/30">
                <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> 2FA Inactive
              </span>`;
+      }
+
+      if (typeof update2FaBadges === 'function') {
+        update2FaBadges(user.two_factor_enabled);
       }
     }
 
@@ -497,6 +501,15 @@
     const emptyState = document.getElementById('pendingTransfersEmpty');
     if (!container) return;
 
+    // Filter out any transfers that are no longer pending or already expired (remaining <= 0)
+    const expired = AppState.pendingTransfers.filter(t => t.status !== 'pending' || calculateRemainingSeconds(t) <= 0);
+    if (expired.length > 0) {
+      AppState.pendingTransfers = AppState.pendingTransfers.filter(t => t.status === 'pending' && calculateRemainingSeconds(t) > 0);
+      apiFetch('/api/cron').catch(() => {});
+      apiFetch('/api/transfers/pending').catch(() => {});
+      apiFetch('/api/transfers/balances').catch(() => {});
+    }
+
     if (AppState.pendingTransfers.length === 0) {
       container.innerHTML = '';
       if (emptyState) emptyState.classList.remove('hidden');
@@ -577,6 +590,7 @@
 
   // Calculate remaining seconds for a transfer with UTC normalization
   function calculateRemainingSeconds(transfer) {
+    if (!transfer) return 0;
     if (typeof transfer.seconds_remaining === 'number' && !transfer._expiresMs) {
       transfer._expiresMs = Date.now() + (transfer.seconds_remaining * 1000);
     }
@@ -594,15 +608,83 @@
     return Math.max(0, Math.floor((expiresMs - Date.now()) / 1000));
   }
 
+  // Instantly dissolve expired hold card with smooth fade-out and DOM removal within 500ms
+  function dissolveExpiredTransfer(transfer) {
+    if (!transfer) return;
+    const transferId = transfer.id;
+    const cardEl = document.getElementById(`pending-card-${transferId}`);
+
+    if (cardEl) {
+      // Instantly apply a smooth fade-out CSS animation (opacity 0, scale 0.95)
+      cardEl.classList.add('card-dissolve');
+      cardEl.style.transition = 'opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), max-height 0.45s ease, margin 0.45s ease, padding 0.45s ease';
+      cardEl.style.opacity = '0';
+      cardEl.style.transform = 'scale(0.95)';
+      cardEl.style.pointerEvents = 'none';
+
+      // Remove from DOM within 500ms
+      setTimeout(() => {
+        if (cardEl && cardEl.parentNode) {
+          cardEl.remove();
+        }
+        const container = document.getElementById('pendingTransfersContainer');
+        const emptyState = document.getElementById('pendingTransfersEmpty');
+        if (container && (!container.children || container.children.length === 0) && emptyState) {
+          emptyState.classList.remove('hidden');
+        }
+      }, 450);
+    }
+
+    // Update AppState.pendingTransfers to remove the expired transfer immediately
+    AppState.pendingTransfers = AppState.pendingTransfers.filter(item => item.id !== transferId);
+
+    // Re-render balances (renderHeaderAndBalances()) so the Escrow Protected count and amounts update immediately
+    renderHeaderAndBalances();
+
+    const emptyState = document.getElementById('pendingTransfersEmpty');
+    if (AppState.pendingTransfers.length === 0 && emptyState) {
+      emptyState.classList.remove('hidden');
+    }
+
+    // Trigger apiFetch('/api/transfers/pending') and apiFetch('/api/transfers/balances') in background to sync database state
+    apiFetch('/api/cron').catch(() => {});
+    apiFetch('/api/transfers/pending').then(pRes => {
+      if (pRes && pRes.success) {
+        const payload = pRes.data || pRes;
+        const fresh = payload.transfers || payload.pending || [];
+        AppState.pendingTransfers = fresh.filter(item => item.status === 'pending' && calculateRemainingSeconds(item) > 0);
+        renderPendingTransfers();
+        renderHeaderAndBalances();
+      }
+    }).catch(e => console.debug('Pending sync notice:', e));
+
+    apiFetch('/api/transfers/balances').then(bRes => {
+      if (bRes && bRes.success) {
+        const payload = bRes.data || bRes;
+        if (payload.balances) AppState.balances = payload.balances;
+        renderHeaderAndBalances();
+      }
+    }).catch(e => console.debug('Balances sync notice:', e));
+  }
+  window.dissolveExpiredTransfer = dissolveExpiredTransfer;
+
   // Real-time Countdown Ticker (1-second tick)
   function startTicker() {
     if (AppState.tickerInterval) clearInterval(AppState.tickerInterval);
 
     AppState.tickerInterval = setInterval(() => {
-      let expiredFound = false;
+      const expiredList = [];
 
       AppState.pendingTransfers.forEach(t => {
         const remaining = calculateRemainingSeconds(t);
+
+        // When a transfer's remaining seconds reaches <= 0:
+        // Must NOT remain stuck at 00:00! Collect for instant dissolution.
+        if (remaining <= 0) {
+          expiredList.push(t);
+          return;
+        }
+
         const total = t.total_seconds || (AppState.settings.undoWindowMinutes * 60);
         const percent = Math.min(100, Math.max(0, (remaining / total) * 100));
         const isUrgent = remaining <= 60;
@@ -622,15 +704,11 @@
             progressBarEl.classList.remove('urgent');
           }
         }
-
-        if (remaining <= 0 && !t._markedExpired) {
-          t._markedExpired = true;
-          expiredFound = true;
-        }
       });
 
-      if (expiredFound) {
-        handleExpiredTransfers();
+      if (expiredList.length > 0) {
+        showToast('Undo window expired. Funds releasing on Solana...', 'info', 3000);
+        expiredList.forEach(t => dissolveExpiredTransfer(t));
       }
     }, 1000);
   }
@@ -661,7 +739,8 @@
 
         if (pendRes && pendRes.success) {
           const payload = pendRes.data || pendRes;
-          AppState.pendingTransfers = payload.transfers || payload.pending || [];
+          const fresh = payload.transfers || payload.pending || [];
+          AppState.pendingTransfers = fresh.filter(t => t.status === 'pending' && calculateRemainingSeconds(t) > 0);
         }
 
         if (histRes && histRes.success) {
@@ -829,12 +908,13 @@
         return;
       }
 
-      // Button loading state
+      // Button loading state & Full-fidelity loading modal
       if (submitBtn) submitBtn.disabled = true;
       if (submitBtnSpinner) submitBtnSpinner.classList.remove('hidden');
-      if (submitBtnText) submitBtnText.textContent = 'Processing Transfer...';
+      if (submitBtnText) submitBtnText.textContent = 'Securing into Undo Window...';
 
       const windowMinutes = getSelectedWindowMinutes();
+      openTransferLoadingModal({ token, amount, destination, windowMinutes, note });
 
       try {
         const res = await apiFetch('/api/transfers/initiate', {
@@ -843,10 +923,13 @@
         });
 
         if (res.success) {
-          showToast(res.message || 'Transfer submitted!', 'success');
-          // Reset form
+          // Reset form inputs & notice
           form.reset();
           updateNotice();
+
+          // Transition to gorgeous Phantom-style Success Screen modal
+          showTransferSuccessReceipt(res, { token, amount, destination, windowMinutes, note });
+
           // Reload real server state
           try {
             const [bRes, pRes, hRes] = await Promise.all([
@@ -860,7 +943,8 @@
             }
             if (pRes && pRes.success) {
               const p = pRes.data || pRes;
-              AppState.pendingTransfers = p.transfers || p.pending || [];
+              const fresh = p.transfers || p.pending || [];
+              AppState.pendingTransfers = fresh.filter(t => t.status === 'pending' && calculateRemainingSeconds(t) > 0);
             }
             if (hRes && hRes.success) {
               const p = hRes.data || hRes;
@@ -873,9 +957,11 @@
           renderPendingTransfers();
           renderHistoryTable();
         } else {
+          closeTransferReceiptModal();
           showToast(res.error || 'Failed to initiate transfer', 'error');
         }
       } catch (err) {
+        closeTransferReceiptModal();
         showToast(err.message || 'Network error occurred', 'error');
       } finally {
         if (submitBtn) submitBtn.disabled = false;
@@ -886,6 +972,203 @@
 
     updateNotice();
   }
+
+  // Current Receipt Data Cache for Copy & Navigation Actions
+  let currentReceiptData = null;
+
+  // Format timelock minutes into badge label (e.g., "10m Undo Window Active")
+  function formatBadgeDuration(minutes) {
+    const m = parseInt(minutes, 10) || 10;
+    if (m >= 525600) {
+      const y = Math.round(m / 525600);
+      return `${y}y Undo Window Active`;
+    }
+    if (m >= 43200) {
+      const mo = Math.round(m / 43200);
+      return `${mo}mo Undo Window Active`;
+    }
+    if (m >= 10080) {
+      const w = Math.round(m / 10080);
+      return `${w}w Undo Window Active`;
+    }
+    if (m >= 1440) {
+      const d = Math.round(m / 1440);
+      return `${d}d Undo Window Active`;
+    }
+    if (m >= 60) {
+      const h = Math.round(m / 60);
+      return `${h}h Undo Window Active`;
+    }
+    return `${m}m Undo Window Active`;
+  }
+  window.formatBadgeDuration = formatBadgeDuration;
+
+  // Open Full-Fidelity Loading Screen Modal
+  function openTransferLoadingModal(data = {}) {
+    const modal = document.getElementById('transferReceiptModal');
+    const loadingView = document.getElementById('transferReceiptLoadingView');
+    const successView = document.getElementById('transferReceiptSuccessView');
+    const closeBtn = document.getElementById('transferReceiptCloseBtn');
+
+    if (loadingView) loadingView.classList.remove('hidden');
+    if (successView) successView.classList.add('hidden');
+    if (closeBtn) closeBtn.classList.add('hidden');
+
+    const stepEl = document.getElementById('transferReceiptLoadingStep');
+    if (stepEl) {
+      stepEl.textContent = 'Validating timelock & reserving escrow balance...';
+    }
+
+    if (modal) modal.classList.remove('hidden');
+  }
+  window.openTransferLoadingModal = openTransferLoadingModal;
+
+  // Close Transfer Receipt Modal
+  function closeTransferReceiptModal() {
+    const modal = document.getElementById('transferReceiptModal');
+    if (modal) modal.classList.add('hidden');
+  }
+  window.closeTransferReceiptModal = closeTransferReceiptModal;
+
+  // Show Gorgeous Phantom-Style Success Screen Modal
+  function showTransferSuccessReceipt(responseData, requestData = {}) {
+    const modal = document.getElementById('transferReceiptModal');
+    const loadingView = document.getElementById('transferReceiptLoadingView');
+    const successView = document.getElementById('transferReceiptSuccessView');
+    const closeBtn = document.getElementById('transferReceiptCloseBtn');
+
+    const payload = (responseData && responseData.data) ? responseData.data : (responseData || {});
+    const token = payload.token || requestData.token || 'SOL';
+    const amount = parseFloat(payload.amount !== undefined ? payload.amount : (requestData.amount || 0));
+    const destination = payload.destination || requestData.destination || '';
+    const note = payload.note !== undefined ? payload.note : (requestData.note || '');
+    const windowMinutes = parseInt(payload.window_minutes || requestData.windowMinutes || 10, 10);
+    const transferId = payload.transfer_id || payload.id;
+
+    // Format Amount in JetBrains Mono
+    const formattedAmt = formatAmount(amount, token === 'SOL' ? 4 : 2);
+    // Share text amount: e.g. '0.10' for 0.1 SOL
+    const shareAmt = (amount < 0.01) ? amount.toFixed(4) : (Math.round(amount * 100) / 100).toFixed(2);
+    const shareText = `🛡️ Just sent ${shareAmt} ${token} protected by SolRecall undo window!`;
+
+    const price = (AppState.balances[token] && AppState.balances[token].price)
+      ? AppState.balances[token].price
+      : (token === 'SOL' ? 185.0 : 1.0);
+    const fiatVal = (amount * price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const windowBadgeText = formatBadgeDuration(windowMinutes);
+
+    currentReceiptData = {
+      transferId,
+      token,
+      amount,
+      formattedAmt,
+      shareAmt,
+      destination,
+      note,
+      windowMinutes,
+      windowBadgeText,
+      shareText
+    };
+
+    // Populate Success Screen Elements
+    const amtEl = document.getElementById('receiptAmount');
+    if (amtEl) amtEl.textContent = formattedAmt;
+
+    const tokEl = document.getElementById('receiptTokenSymbol');
+    if (tokEl) tokEl.textContent = token;
+
+    const fiatEl = document.getElementById('receiptFiatValue');
+    if (fiatEl) fiatEl.textContent = `≈ $${fiatVal} USD`;
+
+    const logoEl = document.getElementById('receiptTokenLogo');
+    if (logoEl) {
+      const tLogo = tokenLogos[token] || tokenLogos.SOL;
+      logoEl.src = tLogo.url;
+      logoEl.onerror = () => { logoEl.src = tLogo.local; };
+    }
+
+    const destEl = document.getElementById('receiptDestinationTruncated');
+    if (destEl) {
+      destEl.textContent = truncateAddress(destination, 6, 6);
+      destEl.title = destination;
+    }
+
+    const badgeTextEl = document.getElementById('receiptWindowText');
+    if (badgeTextEl) badgeTextEl.textContent = windowBadgeText;
+
+    const noteRow = document.getElementById('receiptNoteRow');
+    const noteText = document.getElementById('receiptNoteText');
+    if (noteRow && noteText) {
+      if (note) {
+        noteText.textContent = note;
+        noteRow.classList.remove('hidden');
+      } else {
+        noteRow.classList.add('hidden');
+      }
+    }
+
+    // Reset share button text
+    const shareBtnText = document.getElementById('receiptCopyShareBtnText');
+    if (shareBtnText) shareBtnText.textContent = 'Copy Share Text';
+
+    // Transition views smoothly
+    if (loadingView) loadingView.classList.add('hidden');
+    if (successView) successView.classList.remove('hidden');
+    if (closeBtn) closeBtn.classList.remove('hidden');
+    if (modal) modal.classList.remove('hidden');
+  }
+  window.showTransferSuccessReceipt = showTransferSuccessReceipt;
+
+  // Copy Recipient Address from Receipt Modal
+  async function copyReceiptDestination() {
+    if (currentReceiptData && currentReceiptData.destination) {
+      await copyToClipboard(currentReceiptData.destination, 'Recipient address');
+    }
+  }
+  window.copyReceiptDestination = copyReceiptDestination;
+
+  // Copy Share Text ('🛡️ Just sent 0.10 SOL protected by SolRecall undo window!')
+  async function copyReceiptShareText() {
+    if (!currentReceiptData || !currentReceiptData.shareText) return;
+    const copied = await copyToClipboard(currentReceiptData.shareText, 'Share text');
+    if (copied) {
+      const btnText = document.getElementById('receiptCopyShareBtnText');
+      if (btnText) {
+        const orig = btnText.textContent;
+        btnText.textContent = 'Copied Share Text! 🎉';
+        setTimeout(() => {
+          btnText.textContent = orig;
+        }, 2000);
+      }
+    }
+  }
+  window.copyReceiptShareText = copyReceiptShareText;
+
+  // View newly created hold in Active Holds section
+  function viewReceiptInActiveHolds() {
+    closeTransferReceiptModal();
+    if (typeof window.switchTab === 'function') {
+      window.switchTab('overview');
+    }
+    setTimeout(() => {
+      const holdsContainer = document.getElementById('pendingTransfersContainer') || document.getElementById('tab-content-overview');
+      if (holdsContainer) {
+        holdsContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+      if (currentReceiptData && currentReceiptData.transferId) {
+        const card = document.getElementById(`pending-card-${currentReceiptData.transferId}`);
+        if (card) {
+          card.classList.add('solana-border-glow', 'ring-2', 'ring-purple-500/50');
+          setTimeout(() => {
+            card.classList.remove('solana-border-glow', 'ring-2', 'ring-purple-500/50');
+          }, 3000);
+        }
+      }
+    }, 150);
+  }
+  window.viewReceiptInActiveHolds = viewReceiptInActiveHolds;
+
 
   // Cancel Transfer Modal Handlers
   function openCancelModal(transferId) {
@@ -1207,6 +1490,7 @@
       if (res.success) {
         showToast('Two-factor authentication successfully enabled!', 'success');
         if (AppState.user) AppState.user.two_factor_enabled = 1;
+        update2FaBadges(1);
         renderHeaderAndBalances();
         close2FaModal();
       } else {
@@ -1219,6 +1503,100 @@
     }
   }
   window.verifyAndEnable2Fa = verifyAndEnable2Fa;
+
+  // 2FA Badge & Status Synchronizer
+  function update2FaBadges(enabled) {
+    const isEnabled = !!Number(enabled);
+
+    const twoFaBadge = document.getElementById('twoFaHeaderBadge');
+    if (twoFaBadge) {
+      twoFaBadge.innerHTML = isEnabled
+        ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+             <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> 2FA Secured
+           </span>`
+        : `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/30">
+             <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> 2FA Inactive
+           </span>`;
+    }
+
+    const settingsBadge = document.getElementById('settingsTwoFaBadge');
+    if (settingsBadge) {
+      settingsBadge.textContent = isEnabled ? 'Active' : 'Inactive';
+      settingsBadge.className = isEnabled
+        ? 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+        : 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30';
+    }
+
+    const deleteBtn = document.getElementById('btnDelete2Fa');
+    if (deleteBtn) {
+      if (isEnabled) {
+        deleteBtn.classList.remove('hidden');
+      } else {
+        deleteBtn.classList.add('hidden');
+      }
+    }
+  }
+  window.update2FaBadges = update2FaBadges;
+
+  // Delete / Reset 2FA Key Modal Handlers
+  function openDelete2FaModal() {
+    const modal = document.getElementById('delete2FaModal');
+    if (!modal) return;
+    const pwd = document.getElementById('delete2FaPassword');
+    const totp = document.getElementById('delete2FaTotp');
+    if (pwd) pwd.value = '';
+    if (totp) totp.value = '';
+    modal.classList.remove('hidden');
+    if (pwd) pwd.focus();
+  }
+  window.openDelete2FaModal = openDelete2FaModal;
+
+  function closeDelete2FaModal() {
+    const modal = document.getElementById('delete2FaModal');
+    if (modal) modal.classList.add('hidden');
+  }
+  window.closeDelete2FaModal = closeDelete2FaModal;
+
+  async function submitDelete2Fa() {
+    const pwdInput = document.getElementById('delete2FaPassword');
+    const totpInput = document.getElementById('delete2FaTotp');
+    const password = pwdInput ? pwdInput.value : '';
+    const code = totpInput ? totpInput.value.trim() : '';
+
+    if (!password && !code) {
+      showToast('Please enter your account password and/or 6-digit 2FA code to confirm removal.', 'warning');
+      return;
+    }
+
+    const btn = document.getElementById('confirmDelete2FaBtn');
+    const spinner = document.getElementById('delete2FaSpinner');
+    if (btn) btn.disabled = true;
+    if (spinner) spinner.classList.remove('hidden');
+
+    try {
+      const res = await apiFetch('/api/auth/2fa/disable', {
+        method: 'POST',
+        body: JSON.stringify({ password, code })
+      });
+
+      if (res.success) {
+        showToast('Two-Factor Authentication key deleted successfully.', 'success');
+        if (AppState.user) {
+          AppState.user.two_factor_enabled = 0;
+        }
+        update2FaBadges(0);
+        closeDelete2FaModal();
+      } else {
+        showToast(res.error || res.message || 'Failed to delete 2FA key. Please verify credentials.', 'error');
+      }
+    } catch (err) {
+      showToast(err.message || 'Network error disabling 2FA.', 'error');
+    } finally {
+      if (btn) btn.disabled = false;
+      if (spinner) spinner.classList.add('hidden');
+    }
+  }
+  window.submitDelete2Fa = submitDelete2Fa;
 
   // Export Custodial Private Key Flow
   let currentExportedPrivateKey = '';
@@ -1571,7 +1949,7 @@
         const payload = pendRes.data || pendRes;
         const list = payload.transfers || payload.pending || [];
         if (Array.isArray(list)) {
-          AppState.pendingTransfers = list;
+          AppState.pendingTransfers = list.filter(t => t.status === 'pending' && calculateRemainingSeconds(t) > 0);
         }
       }
     } catch (e) {
@@ -1589,6 +1967,19 @@
       }
     } catch (e) {
       console.warn('Initial history fetch notice:', e.message);
+    }
+
+    // Modal click-outside dismissal
+    const receiptModal = document.getElementById('transferReceiptModal');
+    if (receiptModal) {
+      receiptModal.addEventListener('click', (e) => {
+        if (e.target === receiptModal) {
+          const loadingView = document.getElementById('transferReceiptLoadingView');
+          if (loadingView && loadingView.classList.contains('hidden')) {
+            closeTransferReceiptModal();
+          }
+        }
+      });
     }
 
     try { renderHeaderAndBalances(); } catch (e) { console.error('Error rendering balances:', e); }

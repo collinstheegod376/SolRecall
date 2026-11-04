@@ -245,3 +245,33 @@ code, .font-mono {
   pointer-events: auto !important;
   transition: filter 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+/* Card dissolution animation for expired holds */
+.card-dissolve {
+  opacity: 0 !important;
+  transform: scale(0.95) !important;
+  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), max-height 0.45s ease, margin 0.45s ease, padding 0.45s ease !important;
+  pointer-events: none !important;
+}
+
+/* Loading progress ring animation */
+@keyframes ring-rotate {
+  0% {
+    stroke-dashoffset: 264;
+    transform: rotate(0deg);
+  }
+  50% {
+    stroke-dashoffset: 66;
+    transform: rotate(180deg);
+  }
+  100% {
+    stroke-dashoffset: 264;
+    transform: rotate(360deg);
+  }
+}
+
+.loading-ring-spinner {
+  transform-origin: center;
+  animation: ring-rotate 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+

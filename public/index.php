@@ -82,6 +82,10 @@ if ($path === '/login' || $path === '/login.php') {
     renderView('login.php');
 }
 
+if ($path === '/two-factor-verify' || $path === '/two-factor-verify.php') {
+    renderView('two-factor-verify.php');
+}
+
 if ($path === '/register' || $path === '/register.php') {
     renderView('register.php');
 }
@@ -158,6 +162,16 @@ if (str_starts_with($path, '/api/')) {
 
             if (($sub === '2fa/verify' || $sub === '2fa/enable') && $method === 'POST') {
                 $controller->verify2FA($req)->send();
+                exit;
+            }
+
+            if ($sub === '2fa/verify-login' && $method === 'POST') {
+                $controller->verifyLogin2FA($req)->send();
+                exit;
+            }
+
+            if ($sub === '2fa/disable' && $method === 'POST') {
+                $controller->disable2FA($req)->send();
                 exit;
             }
 

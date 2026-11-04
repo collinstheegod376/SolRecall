@@ -105,27 +105,40 @@ class AuthController extends Controller
                 return $this->jsonError('Login identifier (email or username) and password are required.', 422);
             }
 
-            $twoFactorCode = $request->input('code') ?? $request->input('two_factor_code');
-            if ($twoFactorCode !== null) {
-                $twoFactorCode = (string) $twoFactorCode;
-            }
+            $cleanLogin = trim($login);
+            $user = filter_var($cleanLogin, FILTER_VALIDATE_EMAIL)
+                ? User::findByEmail($cleanLogin)
+                : User::findByUsername($cleanLogin);
 
-            $result = $this->authService->authenticate($login, $password, $twoFactorCode);
-
-            if ($result['requires2FA']) {
-                return Response::json([
-                    'success' => false,
-                    'requires_2fa' => true,
-                    'temp_token' => $result['tempToken'],
-                    'message' => 'Two-Factor Authentication code required to complete login.',
-                ], 200);
-            }
-
-            if (!$result['authenticated'] || $result['user'] === null) {
+            if ($user === null || !$user->verifyPassword($password)) {
                 return $this->jsonError('Invalid credentials. Please verify your username/email and password.', 401);
             }
 
-            $user = $result['user'];
+            // Direct 2FA verification if code provided in initial request
+            $twoFactorCode = $request->input('code') ?? $request->input('two_factor_code');
+            if ($twoFactorCode !== null && trim((string) $twoFactorCode) !== '') {
+                $cleanCode = trim(str_replace([' ', '-'], '', (string) $twoFactorCode));
+                if (!empty($user->two_factor_enabled)) {
+                    if (empty($user->two_factor_secret) || !$this->twoFactorService->verifyCode((string) $user->two_factor_secret, $cleanCode)) {
+                        return $this->jsonError('Invalid or expired authentication code', 400);
+                    }
+                }
+            } elseif (!empty($user->two_factor_enabled)) {
+                // Split 2FA Login into Dedicated 2-Step Flow
+                ensure_session_started();
+                $_SESSION['pending_2fa_user_id'] = (int) $user->id;
+                // DO NOT set $_SESSION['user_id'] yet.
+                unset($_SESSION['user_id']);
+
+                return Response::success([
+                    'requires_2fa' => true,
+                    'redirect' => '/two-factor-verify.php',
+                ], '2FA verification required');
+            }
+
+            // If two_factor_enabled is 0 (or direct code verified), log in normally
+            $this->authService->login($user);
+
             $balances = $user->getBalances();
             $formattedBalances = [];
             foreach ($balances as $token => $b) {
@@ -377,6 +390,7 @@ class AuthController extends Controller
             $user->two_factor_enabled = 1;
             $user->save();
 
+            $_SESSION['two_factor_enabled'] = 1;
             unset($_SESSION['pending_2fa_secret']);
 
             return $this->jsonSuccess([
@@ -386,6 +400,128 @@ class AuthController extends Controller
             return $this->jsonError('Validation failed.', 422, $e->getErrors());
         } catch (Throwable $e) {
             return $this->jsonError('2FA verification failed: ' . $e->getMessage(), 400);
+        }
+    }
+
+    // =========================================================================
+    // 9b. POST /api/auth/2fa/verify-login
+    // =========================================================================
+
+    /**
+     * Validate 6-digit TOTP code for pending 2FA login session and complete authentication.
+     */
+    public function verifyLogin2FA(Request $request): Response
+    {
+        try {
+            ensure_session_started();
+
+            $pendingUserId = $_SESSION['pending_2fa_user_id'] ?? null;
+            if (!$pendingUserId) {
+                return $this->jsonError('Invalid or expired authentication code', 400);
+            }
+
+            $code = (string) ($request->input('code') ?? $request->input('otp') ?? $request->input('two_factor_code') ?? '');
+            $cleanCode = trim(str_replace([' ', '-'], '', $code));
+
+            if (strlen($cleanCode) !== 6 || !ctype_digit($cleanCode)) {
+                return $this->jsonError('Invalid or expired authentication code', 400);
+            }
+
+            $user = User::find((int) $pendingUserId);
+            if ($user === null || empty($user->two_factor_secret)) {
+                return $this->jsonError('Invalid or expired authentication code', 400);
+            }
+
+            if (!$this->twoFactorService->verifyCode((string) $user->two_factor_secret, $cleanCode)) {
+                return $this->jsonError('Invalid or expired authentication code', 400);
+            }
+
+            // On success: sets full $_SESSION['user_id'] and user session
+            $this->authService->login($user);
+
+            // Unsets pending_2fa_user_id
+            unset($_SESSION['pending_2fa_user_id']);
+
+            $balances = $user->getBalances();
+            $formattedBalances = [];
+            foreach ($balances as $token => $b) {
+                $formattedBalances[$token] = [
+                    'available' => (string) $b->available,
+                    'escrow' => (string) $b->escrow,
+                ];
+            }
+
+            return Response::success([
+                'redirect' => '/dashboard.php',
+                'user' => $user->toSafeArray(),
+                'deposit_address' => $user->solana_deposit_address,
+                'balances' => $formattedBalances,
+            ], '2FA verification successful.');
+        } catch (Throwable $e) {
+            return $this->jsonError('Invalid or expired authentication code', 400);
+        }
+    }
+
+    // =========================================================================
+    // 9c. POST /api/auth/2fa/disable
+    // =========================================================================
+
+    /**
+     * Self-service delete / reset 2FA authentication key and disable 2FA.
+     */
+    public function disable2FA(Request $request): Response
+    {
+        try {
+            $user = $this->authService->getCurrentUser();
+            if ($user === null) {
+                return $this->jsonError('Unauthorized. Login required.', 401);
+            }
+
+            $password = (string) ($request->input('password') ?? '');
+            $code = (string) ($request->input('code') ?? $request->input('totp') ?? $request->input('two_factor_code') ?? '');
+
+            $verified = false;
+
+            // If account has a password_hash and password was provided, verify password
+            if (!empty($user->password_hash) && $password !== '') {
+                if (!$user->verifyPassword($password)) {
+                    return $this->jsonError('Incorrect account password. Verification failed.', 403);
+                }
+                $verified = true;
+            }
+
+            // If 2FA code was provided, verify against current secret
+            if ($code !== '') {
+                $cleanCode = trim(str_replace([' ', '-'], '', $code));
+                if (!empty($user->two_factor_secret) && !$this->twoFactorService->verifyCode((string) $user->two_factor_secret, $cleanCode)) {
+                    return $this->jsonError('Invalid or expired authentication code', 400);
+                }
+                $verified = true;
+            }
+
+            // Requires current password AND/OR 6-digit 2FA code to verify authorization
+            if (!$verified) {
+                return $this->jsonError('Please provide your current password and/or 6-digit 2FA code to confirm deletion.', 400);
+            }
+
+            // Updates DB: UPDATE users SET two_factor_enabled = 0, two_factor_secret = NULL WHERE id = ?
+            \App\Core\Database::getInstance()->execute(
+                "UPDATE users SET two_factor_enabled = 0, two_factor_secret = NULL WHERE id = ?",
+                [(int) $user->id]
+            );
+
+            // Update user instance and session
+            $user->two_factor_enabled = 0;
+            $user->two_factor_secret = null;
+
+            ensure_session_started();
+            $_SESSION['two_factor_enabled'] = 0;
+
+            return $this->jsonSuccess([
+                'two_factor_enabled' => false,
+            ], 'Two-Factor Authentication key deleted successfully.');
+        } catch (Throwable $e) {
+            return $this->jsonError('Failed to disable 2FA: ' . $e->getMessage(), 500);
         }
     }
 

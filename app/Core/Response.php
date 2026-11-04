@@ -116,11 +116,19 @@ class Response
      */
     public static function success(mixed $data = null, string $message = 'Success', int $status = 200): static
     {
-        return static::json([
+        $payload = [
             'success' => true,
             'message' => $message,
             'data' => $data,
-        ], $status);
+        ];
+        if (is_array($data)) {
+            foreach ($data as $key => $val) {
+                if (!isset($payload[$key])) {
+                    $payload[$key] = $val;
+                }
+            }
+        }
+        return static::json($payload, $status);
     }
 
     /**

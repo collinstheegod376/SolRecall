@@ -38,8 +38,16 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard • Undo Window for Solana Transfers</title>
-  <link rel="icon" type="image/jpeg" href="/logo.jpg">
+  <title>SolRecall - Reversible Time-Locked Escrow on Solana</title>
+  <link rel="icon" type="image/png" href="/assets/img/logo.png">
+  <link rel="apple-touch-icon" href="/assets/img/logo.png">
+  <!-- PWA & Mobile Meta Tags -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#07090e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SolRecall">
   <!-- Client-side QRCode Generator (Offline / Ad-blocker proof) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <!-- Google Fonts: Inter (UI), JetBrains Mono (Addresses/Code), Space Grotesk (Wordmark) -->
@@ -92,13 +100,10 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
         <!-- Left: Logo & Project Brand -->
         <div class="flex items-center gap-3">
           <a href="/dashboard.php" class="flex items-center gap-2.5 group">
-            <img src="/logo.jpg" alt="Solana Undo Logo" class="w-9 h-9 rounded-xl shadow-md border border-purple-500/30 group-hover:scale-105 transition-transform duration-200 object-cover">
+            <img src="/assets/img/logo.png" alt="SolRecall Logo" class="w-9 h-9 rounded-xl shadow-md border border-purple-500/30 group-hover:scale-105 transition-transform duration-200 object-cover">
             <div>
               <div class="flex items-center gap-2">
-                <span class="text-base font-bold tracking-tight text-white font-display">Undo Window</span>
-                <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20">
-                  SOLANA ESCROW
-                </span>
+                <span class="text-base font-bold tracking-tight text-white font-display">SolRecall</span>
               </div>
             </div>
           </a>
@@ -126,10 +131,17 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
         <!-- Right: Deposit Pill, Profile, and Mobile Hamburger -->
         <div class="flex items-center gap-2.5">
 
-          <!-- Network badge (Static dot, no animation) -->
-          <div class="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-            <span>Devnet</span>
+          <!-- 2FA Header Status Badge -->
+          <div id="twoFaHeaderBadge" class="hidden sm:inline-flex items-center">
+            <?php if (!empty($_SESSION['two_factor_enabled'])): ?>
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> 2FA Secured
+              </span>
+            <?php else: ?>
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> 2FA Inactive
+              </span>
+            <?php endif; ?>
           </div>
 
           <!-- Deposit Address Pill -->
@@ -330,11 +342,6 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
                 <h2 class="text-lg font-bold text-white tracking-tight">Active Undo Holds</h2>
-                <span class="text-xs text-slate-400">Live Escrow</span>
-              </div>
-              <div class="text-xs text-slate-400 flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                <span>Auto-ticker active</span>
               </div>
             </div>
 
@@ -431,7 +438,7 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
                          id="transferDestination"
                          required
                          autocomplete="off"
-                         placeholder="Base58 Solana address (e.g. 7xKX...)"
+                         placeholder="Recipient Solana wallet address..."
                          class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-white font-mono text-xs focus:outline-none focus:border-purple-500 transition">
                 </div>
 
@@ -661,16 +668,25 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
                     <p class="text-xs text-slate-400">Google Authenticator or TOTP</p>
                   </div>
                 </div>
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                  Active
+                <span id="settingsTwoFaBadge" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold <?= !empty($_SESSION['two_factor_enabled']) ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/10 text-amber-400 border border-amber-500/30' ?>">
+                  <?= !empty($_SESSION['two_factor_enabled']) ? 'Active' : 'Inactive' ?>
                 </span>
               </div>
               <p class="text-xs text-slate-400">
                 2FA protects critical actions like private key export and immediate token withdrawals.
               </p>
-              <button type="button" onclick="open2FaModal()" class="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-xs font-medium text-slate-200 transition">
-                Configure / Re-verify 2FA
-              </button>
+              <div class="flex flex-col sm:flex-row gap-2">
+                <button type="button" onclick="open2FaModal()" class="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-xs font-medium text-slate-200 transition">
+                  Configure / Re-verify 2FA
+                </button>
+                <button type="button"
+                        id="btnDelete2Fa"
+                        onclick="openDelete2FaModal()"
+                        class="<?= empty($_SESSION['two_factor_enabled']) ? 'hidden ' : '' ?>py-2 px-3 rounded-xl border border-rose-500/40 text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/60 text-xs font-medium transition flex items-center justify-center gap-1.5 cursor-pointer">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                  Delete / Reset 2FA Key
+                </button>
+              </div>
             </div>
 
             <!-- Custodial Key Export Security Card -->
@@ -797,6 +813,21 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
 
     </main>
 
+    <!-- SolRecall Brand Footer -->
+    <footer class="border-t border-white/5 mt-12 py-6 text-xs text-slate-500">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+        <div class="flex items-center gap-2.5">
+          <img src="/assets/img/logo.png" alt="SolRecall Logo" class="w-5 h-5 rounded-lg border border-purple-500/20 object-cover">
+          <span class="font-semibold text-slate-300 font-display">SolRecall</span>
+          <span class="text-slate-600">&bull;</span>
+          <span>Reversible Time-Locked Escrow on Solana</span>
+        </div>
+        <div class="text-[11px] text-slate-500">
+          &copy; <?= date('Y') ?> SolRecall. All rights reserved.
+        </div>
+      </div>
+    </footer>
+
   </div>
 
   <!-- Mobile Bottom Navigation Bar (fixed on mobile with ample clearance) -->
@@ -833,7 +864,7 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
         </div>
         <div>
-          <h3 class="text-base font-bold text-white">Cancel Pending Transfer?</h3>
+          <h3 class="text-base font-bold text-white">Cancel Pending SolRecall Transfer?</h3>
           <p class="text-xs text-slate-400">Funds will immediately return to your balance</p>
         </div>
       </div>
@@ -841,7 +872,7 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
       <div id="cancelModalDetails"></div>
 
       <p class="text-xs text-slate-300 leading-relaxed">
-        Because this transfer is still in the undo escrow window, cancelling it stops the broadcast. <strong>100% of the funds will instantly credit back to your available balance.</strong>
+        Because this transfer is still in the SolRecall undo escrow window, cancelling it stops the broadcast. <strong>100% of the funds will instantly credit back to your available balance.</strong>
       </p>
 
       <div class="flex items-center justify-end gap-3 pt-3 border-t border-white/5">
@@ -859,7 +890,7 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
   <div id="depositModal" class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
     <div class="glass-panel rounded-3xl max-w-sm w-full p-6 border border-white/10 shadow-2xl text-center space-y-4 max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between">
-        <h3 class="text-sm font-bold text-white">Your Custodial Deposit Address</h3>
+        <h3 class="text-sm font-bold text-white">SolRecall Custodial Deposit Address</h3>
         <button type="button" onclick="closeDepositModal()" class="text-slate-400 hover:text-white text-xs">✕</button>
       </div>
 
@@ -896,7 +927,7 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
   <div id="twoFaModal" class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
     <div class="glass-panel rounded-3xl max-w-sm w-full p-6 border border-white/10 shadow-2xl space-y-4 text-center max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between">
-        <h3 class="text-sm font-bold text-white">Setup Authenticator App</h3>
+        <h3 class="text-sm font-bold text-white">SolRecall 2FA Security Setup</h3>
         <button type="button" onclick="close2FaModal()" class="text-slate-400 hover:text-white text-xs">✕</button>
       </div>
 
@@ -921,6 +952,46 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
     </div>
   </div>
 
+  <!-- 3b. Delete / Reset 2FA Key Modal -->
+  <div id="delete2FaModal" class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+    <div class="glass-panel rounded-3xl max-w-sm w-full p-6 border border-rose-500/30 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2.5 text-rose-400">
+          <div class="w-8 h-8 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+            </svg>
+          </div>
+          <h3 class="text-sm font-bold text-white">Delete / Reset 2FA Key</h3>
+        </div>
+        <button type="button" onclick="closeDelete2FaModal()" class="text-slate-400 hover:text-white text-xs">✕</button>
+      </div>
+
+      <div class="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300 leading-relaxed text-left">
+        <strong>Security Warning:</strong> Removing your Two-Factor Authentication key disables 2FA on your account. Authorize removal using your account password and/or 6-digit TOTP code.
+      </div>
+
+      <div class="space-y-3 text-left">
+        <div>
+          <label for="delete2FaPassword" class="block text-xs font-semibold text-slate-300 mb-1">Account Password</label>
+          <input type="password" id="delete2FaPassword" placeholder="Enter current password" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-rose-500 transition">
+        </div>
+        <div>
+          <label for="delete2FaTotp" class="block text-xs font-semibold text-slate-300 mb-1">6-Digit 2FA Authenticator Code</label>
+          <input type="text" id="delete2FaTotp" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="000000" class="w-full text-center tracking-widest font-mono text-base py-2 rounded-xl bg-slate-900 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 transition">
+        </div>
+      </div>
+
+      <div class="flex gap-2 pt-2">
+        <button type="button" onclick="closeDelete2FaModal()" class="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition cursor-pointer">Cancel</button>
+        <button type="button" id="confirmDelete2FaBtn" onclick="submitDelete2Fa()" class="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white shadow-lg shadow-rose-600/20 transition flex items-center justify-center gap-1.5 cursor-pointer">
+          <span id="delete2FaSpinner" class="hidden spinner-sm"></span>
+          <span>Delete 2FA Key</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- 4. Export Private Key Modal -->
   <div id="exportKeyModal" class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
     <div class="glass-panel rounded-3xl max-w-md w-full p-6 border border-rose-500/40 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto relative">
@@ -933,7 +1004,7 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
             </div>
             <div>
-              <h3 class="text-base font-bold text-white">Security Check: Export Key</h3>
+              <h3 class="text-base font-bold text-white">SolRecall Security Check: Export Key</h3>
               <p class="text-xs text-rose-300 font-medium">Verify your identity to decrypt your custodial wallet</p>
             </div>
           </div>
@@ -971,7 +1042,7 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
             </div>
             <div>
-              <h3 class="text-base font-bold text-white">Custodial Solana Keypair</h3>
+              <h3 class="text-base font-bold text-white">SolRecall Custodial Solana Keypair</h3>
               <p class="text-xs text-slate-400">Import this Base58 private key into Phantom or Solflare</p>
             </div>
           </div>
@@ -1040,6 +1111,182 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
     </div>
   </div>
 
+  <!-- 5. Phantom-Style Transfer Loading & Success Receipt Modal -->
+  <div id="transferReceiptModal" class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+    <div class="glass-panel rounded-3xl max-w-md w-full p-6 sm:p-8 border border-white/10 shadow-[0_0_60px_rgba(0,0,0,0.85)] text-center relative overflow-hidden backdrop-blur-2xl transition-all duration-300">
+
+      <!-- Ambient Glows -->
+      <div class="absolute -top-24 -left-24 w-48 h-48 bg-purple-600/20 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute -top-24 -right-24 w-48 h-48 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+      <!-- Close Button (Visible on Success) -->
+      <button type="button"
+              id="transferReceiptCloseBtn"
+              onclick="closeTransferReceiptModal()"
+              class="hidden absolute top-4 right-4 text-slate-400 hover:text-white p-2 rounded-xl hover:bg-white/5 transition z-10 cursor-pointer"
+              title="Close">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+
+      <!-- VIEW A: Full-Fidelity Loading Screen -->
+      <div id="transferReceiptLoadingView" class="py-6 space-y-6">
+        <!-- Animated Progress Ring with Pulsing Solana Shield -->
+        <div class="relative w-28 h-28 mx-auto flex items-center justify-center">
+          <div class="absolute inset-0 rounded-full bg-purple-500/20 blur-xl animate-pulse"></div>
+          
+          <!-- Animated SVG Progress Ring -->
+          <svg class="w-28 h-28 -rotate-90 transform" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="42" stroke="currentColor" stroke-width="6" class="text-slate-800/80" fill="transparent"/>
+            <circle cx="50" cy="50" r="42" stroke="url(#loadingGradient)" stroke-width="6" stroke-linecap="round" class="loading-ring-spinner" fill="transparent" stroke-dasharray="264" stroke-dashoffset="66"/>
+            <defs>
+              <linearGradient id="loadingGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#9945FF" />
+                <stop offset="50%" stop-color="#6366F1" />
+                <stop offset="100%" stop-color="#14F195" />
+              </linearGradient>
+            </defs>
+          </svg>
+
+          <!-- Centered Pulsing Solana Shield Icon -->
+          <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-600/30 to-emerald-500/20 border border-purple-500/40 flex items-center justify-center shadow-lg shadow-purple-500/20 animate-pulse-ring">
+              <svg class="w-7 h-7 text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <h3 class="text-xl font-bold text-white tracking-tight font-display">Securing into SolRecall Escrow...</h3>
+          <p class="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
+            Reserving funds into revocable escrow hold on Solana.
+          </p>
+        </div>
+
+        <!-- Micro status pulse steps -->
+        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/80 border border-white/5 text-[11px] text-purple-300 font-mono">
+          <span class="w-2 h-2 rounded-full bg-purple-400 animate-ping"></span>
+          <span id="transferReceiptLoadingStep">Validating timelock & reserving escrow balance...</span>
+        </div>
+      </div>
+
+      <!-- VIEW B: Phantom-Style Success Receipt Screen (Designed for Screenshots & Sharing) -->
+      <div id="transferReceiptSuccessView" class="hidden py-2 space-y-5 text-center">
+        
+        <!-- Glowing green checkmark / shield badge -->
+        <div class="relative w-20 h-20 mx-auto flex items-center justify-center">
+          <div class="absolute inset-0 rounded-full bg-emerald-500/30 blur-xl animate-pulse"></div>
+          <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-emerald-500/20 via-emerald-500/30 to-purple-500/20 border-2 border-emerald-400/60 flex items-center justify-center shadow-[0_0_30px_rgba(20,241,149,0.35)]">
+            <svg class="w-10 h-10 text-emerald-400 drop-shadow-[0_0_8px_rgba(20,241,149,0.6)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Headline -->
+        <div>
+          <h3 class="text-xl sm:text-2xl font-black text-white tracking-tight font-display">Transfer Escrowed & Protected</h3>
+          <p class="text-xs text-slate-400 mt-1">Secured inside SolRecall Undo Window</p>
+        </div>
+
+        <!-- Large Bold Amount with Official Token Logo -->
+        <div class="p-4 rounded-2xl bg-black/50 border border-white/10 shadow-inner">
+          <div class="flex items-center justify-center gap-3">
+            <img id="receiptTokenLogo"
+                 src="https://cryptologos.cc/logos/solana-sol-logo.png"
+                 onerror="this.src='/assets/img/sol.png'"
+                 alt="Token"
+                 class="w-10 h-10 rounded-full object-contain p-1 bg-black/60 border border-white/15 shrink-0 shadow-md">
+            <span id="receiptAmount" class="font-mono text-3xl sm:text-4xl font-black text-white tracking-tight">0.1000</span>
+            <span id="receiptTokenSymbol" class="text-lg font-bold text-slate-300 font-sans">SOL</span>
+          </div>
+          <div id="receiptFiatValue" class="text-xs text-slate-400 font-mono mt-1">≈ $18.45 USD</div>
+        </div>
+
+        <!-- Details Card -->
+        <div class="bg-slate-900/90 rounded-2xl p-4 border border-white/5 space-y-3 text-left">
+          
+          <!-- Recipient row with 1-click copy icon -->
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-slate-400 font-medium">Recipient Address:</span>
+            <div class="flex items-center gap-1.5">
+              <span id="receiptDestinationTruncated" class="font-mono text-purple-300 font-semibold bg-slate-950 px-2.5 py-1 rounded-lg border border-white/5">
+                7xKX...gAsU
+              </span>
+              <button type="button"
+                      id="receiptCopyDestBtn"
+                      onclick="copyReceiptDestination()"
+                      class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
+                      title="Copy full recipient address">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Undo Timelock Duration Badge -->
+          <div class="flex items-center justify-between text-xs pt-2.5 border-t border-white/5">
+            <span class="text-slate-400 font-medium">Timelock Window:</span>
+            <span id="receiptWindowBadge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+              <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              <span id="receiptWindowText">10m Undo Window Active</span>
+            </span>
+          </div>
+
+          <!-- Note/Memo row (if present) -->
+          <div id="receiptNoteRow" class="hidden flex items-center justify-between text-xs pt-2.5 border-t border-white/5">
+            <span class="text-slate-400 font-medium">Memo:</span>
+            <span id="receiptNoteText" class="text-slate-300 truncate max-w-[200px]"></span>
+          </div>
+
+        </div>
+
+        <!-- Explainer note -->
+        <div class="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-left flex items-start gap-3">
+          <div class="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </div>
+          <p class="text-xs text-amber-200/90 leading-relaxed font-medium">
+            Funds can be revoked and refunded instantly before the countdown expires.
+          </p>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="space-y-2.5 pt-2">
+          <!-- Primary: Copy Share Text -->
+          <button type="button"
+                  id="receiptCopyShareBtn"
+                  onclick="copyReceiptShareText()"
+                  class="w-full py-3.5 px-4 rounded-xl font-bold text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 border border-purple-400/30 transition shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 text-xs sm:text-sm active:scale-95 cursor-pointer">
+            <svg class="w-4 h-4 text-purple-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+            </svg>
+            <span id="receiptCopyShareBtnText">Copy Share Text</span>
+          </button>
+
+          <!-- Secondary: View in Active Holds -->
+          <button type="button"
+                  onclick="viewReceiptInActiveHolds()"
+                  class="w-full py-3 px-4 rounded-xl font-semibold text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700/80 border border-white/10 transition flex items-center justify-center gap-2 text-xs cursor-pointer">
+            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+            </svg>
+            <span>View in Active Holds</span>
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
   <!-- Toast Container -->
   <div id="toast-container"></div>
 
@@ -1082,5 +1329,16 @@ $isAdmin = (int) ($_SESSION['is_admin'] ?? 0);
   <!-- Core JavaScript modules with automatic cache busting -->
   <script src="/assets/js/wallet.js?v=<?= file_exists(__DIR__ . '/assets/js/wallet.js') ? filemtime(__DIR__ . '/assets/js/wallet.js') : '1.1' ?>"></script>
   <script src="/assets/js/dashboard.js?v=<?= file_exists(__DIR__ . '/assets/js/dashboard.js') ? filemtime(__DIR__ . '/assets/js/dashboard.js') : '1.1' ?>"></script>
+
+  <!-- PWA Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch((err) => {
+          console.warn('[SolRecall] Service Worker registration failed:', err);
+        });
+      });
+    }
+  </script>
 </body>
 </html>
