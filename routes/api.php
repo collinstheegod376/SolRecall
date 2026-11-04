@@ -38,6 +38,11 @@ return function (Router $router): void {
     $router->post('/api/auth/export-key', [AuthController::class, 'exportKey']);
 
     // -------------------------------------------------------------------------
+    // Consolidated Dashboard Bootstrap Endpoint (1-Round-Trip SWR)
+    // -------------------------------------------------------------------------
+    $router->get('/api/dashboard/bootstrap', [TransferController::class, 'bootstrap']);
+
+    // -------------------------------------------------------------------------
     // Transfers & Escrow Endpoints
     // -------------------------------------------------------------------------
     $router->get('/api/transfers/balances', [TransferController::class, 'balances']);

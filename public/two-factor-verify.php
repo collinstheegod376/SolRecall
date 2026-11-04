@@ -36,11 +36,7 @@ if (empty($_SESSION['pending_2fa_user_id'])) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Two-Factor Verification • SolRecall</title>
-  <link rel="icon" type="image/jpeg" href="/logo.jpg">
-  <!-- Google Fonts: Inter (UI), JetBrains Mono (Code/OTP), Space Grotesk (Wordmark) -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="/assets/img/logo.png">
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>

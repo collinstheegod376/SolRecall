@@ -92,6 +92,7 @@ class Database
             // "prepared statement pdo_stmt_... does not exist" when pooler switches connections.
             PDO::ATTR_EMULATE_PREPARES => true,
             PDO::ATTR_STRINGIFY_FETCHES => false,
+            PDO::ATTR_PERSISTENT => true,
         ];
 
         if ($driver === 'sqlite') {

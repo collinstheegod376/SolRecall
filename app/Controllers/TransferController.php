@@ -204,6 +204,27 @@ class TransferController
     }
 
     /**
+     * GET /api/dashboard/bootstrap
+     *
+     * Consolidates auth user details, balances, active pending holds,
+     * transfer history, and threshold settings in a single network round-trip.
+     */
+    public function bootstrap(Request $request): Response
+    {
+        try {
+            $userId = $this->getAuthenticatedUserId($request);
+            if ($userId === null) {
+                return Response::error('Authentication required. Please log in.', 401);
+            }
+
+            $data = $this->transferService->getBootstrapData($userId);
+            return Response::success($data, 'Dashboard bootstrap data retrieved.');
+        } catch (Throwable $e) {
+            return Response::error('Failed to load dashboard bootstrap data: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
      * GET /api/transfers/balances
      *
      * Returns multi-token available and escrow balances for the user.

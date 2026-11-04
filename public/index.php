@@ -208,7 +208,15 @@ if (str_starts_with($path, '/api/')) {
             sendJson(['success' => false, 'error' => "Transfer endpoint '/api/transfers/{$sub}' not found"], 404);
         }
 
-        // C. Settings Endpoint: /api/settings
+        // C. Consolidated Dashboard Bootstrap: /api/dashboard/bootstrap
+        if ($path === '/api/dashboard/bootstrap') {
+            $controller = new TransferController();
+            $req = Request::createFromGlobals();
+            $controller->bootstrap($req)->send();
+            exit;
+        }
+
+        // D. Settings Endpoint: /api/settings
         if ($path === '/api/settings') {
             $controller = new TransferController();
             $req = Request::createFromGlobals();

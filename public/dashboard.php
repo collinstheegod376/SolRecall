@@ -118,10 +118,6 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
   <meta name="apple-mobile-web-app-title" content="SolRecall">
   <!-- Client-side QRCode Generator (Offline / Ad-blocker proof) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <!-- Google Fonts: Inter (UI), JetBrains Mono (Addresses/Code), Space Grotesk (Wordmark) -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -198,19 +194,6 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
 
         <!-- Right: Deposit Pill, Profile, and Mobile Hamburger -->
         <div class="flex items-center gap-2.5">
-
-          <!-- 2FA Header Status Badge -->
-          <div id="twoFaHeaderBadge" class="hidden sm:inline-flex items-center">
-            <?php if (!empty($_SESSION['two_factor_enabled'])): ?>
-              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> 2FA Secured
-              </span>
-            <?php else: ?>
-              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/30">
-                <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> 2FA Inactive
-              </span>
-            <?php endif; ?>
-          </div>
 
           <!-- Deposit Address Pill -->
           <button type="button"
@@ -299,7 +282,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
           <div class="glass-panel glass-panel-hover rounded-2xl p-5 relative overflow-hidden">
             <div class="flex items-center justify-between mb-3">
               <div class="flex items-center gap-2.5">
-                <img src="https://cryptologos.cc/logos/solana-sol-logo.png"
+                <img src="/assets/img/sol.png"
                      onerror="this.src='/assets/img/sol.png'"
                      alt="Solana (SOL)"
                      class="w-8 h-8 rounded-full object-contain shrink-0 p-0.5 bg-black/40 border border-purple-500/30">
@@ -328,7 +311,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
           <div class="glass-panel glass-panel-hover rounded-2xl p-5 relative overflow-hidden">
             <div class="flex items-center justify-between mb-3">
               <div class="flex items-center gap-2.5">
-                <img src="https://cryptologos.cc/logos/usd-coin-usdc-logo.png"
+                <img src="/assets/img/usdc.png"
                      onerror="this.src='/assets/img/usdc.png'"
                      alt="USD Coin (USDC)"
                      class="w-8 h-8 rounded-full object-contain shrink-0 p-0.5 bg-black/40 border border-blue-500/30">
@@ -357,7 +340,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
           <div class="glass-panel glass-panel-hover rounded-2xl p-5 relative overflow-hidden">
             <div class="flex items-center justify-between mb-3">
               <div class="flex items-center gap-2.5">
-                <img src="https://cryptologos.cc/logos/tether-usdt-logo.png"
+                <img src="/assets/img/usdt.png"
                      onerror="this.src='/assets/img/usdt.png'"
                      alt="Tether (USDT)"
                      class="w-8 h-8 rounded-full object-contain shrink-0 p-0.5 bg-black/40 border border-emerald-500/30">
@@ -489,7 +472,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
                         <option value="USDT">USDT</option>
                       </select>
                       <div class="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
-                        <img id="formTokenLogo" src="https://cryptologos.cc/logos/solana-sol-logo.png" onerror="this.src='/assets/img/sol.png'" alt="Token" class="w-4 h-4 rounded-full object-contain">
+                        <img id="formTokenLogo" src="/assets/img/sol.png" onerror="this.src='/assets/img/sol.png'" alt="Token" class="w-4 h-4 rounded-full object-contain">
                       </div>
                       <div class="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-xs">
                         ▼
@@ -723,21 +706,21 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
               <div class="grid grid-cols-3 gap-3 pt-1">
                 <div>
                   <label class="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center gap-1">
-                    <img src="https://cryptologos.cc/logos/solana-sol-logo.png" onerror="this.src='/assets/img/sol.png'" alt="SOL" class="w-3.5 h-3.5 rounded-full inline">
+                    <img src="/assets/img/sol.png" onerror="this.src='/assets/img/sol.png'" alt="SOL" class="w-3.5 h-3.5 rounded-full inline">
                     SOL
                   </label>
                   <input type="number" id="settingsThreshSol" step="0.1" value="2.0" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs font-mono">
                 </div>
                 <div>
                   <label class="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center gap-1">
-                    <img src="https://cryptologos.cc/logos/usd-coin-usdc-logo.png" onerror="this.src='/assets/img/usdc.png'" alt="USDC" class="w-3.5 h-3.5 rounded-full inline">
+                    <img src="/assets/img/usdc.png" onerror="this.src='/assets/img/usdc.png'" alt="USDC" class="w-3.5 h-3.5 rounded-full inline">
                     USDC
                   </label>
                   <input type="number" id="settingsThreshUsdc" step="10" value="100.0" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs font-mono">
                 </div>
                 <div>
                   <label class="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center gap-1">
-                    <img src="https://cryptologos.cc/logos/tether-usdt-logo.png" onerror="this.src='/assets/img/usdt.png'" alt="USDT" class="w-3.5 h-3.5 rounded-full inline">
+                    <img src="/assets/img/usdt.png" onerror="this.src='/assets/img/usdt.png'" alt="USDT" class="w-3.5 h-3.5 rounded-full inline">
                     USDT
                   </label>
                   <input type="number" id="settingsThreshUsdt" step="10" value="100.0" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs font-mono">
@@ -832,7 +815,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
         <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
           <div class="glass-panel rounded-2xl p-4">
             <div class="text-xs text-slate-400 font-semibold uppercase flex items-center gap-1.5">
-              <img src="https://cryptologos.cc/logos/solana-sol-logo.png" onerror="this.src='/assets/img/sol.png'" alt="SOL" class="w-3.5 h-3.5 rounded-full inline">
+              <img src="/assets/img/sol.png" onerror="this.src='/assets/img/sol.png'" alt="SOL" class="w-3.5 h-3.5 rounded-full inline">
               Hot Wallet SOL
             </div>
             <div class="text-xl font-black text-white font-mono mt-1">450.28 <span class="text-xs text-slate-400 font-normal">SOL</span></div>
@@ -840,7 +823,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
           </div>
           <div class="glass-panel rounded-2xl p-4">
             <div class="text-xs text-slate-400 font-semibold uppercase flex items-center gap-1.5">
-              <img src="https://cryptologos.cc/logos/usd-coin-usdc-logo.png" onerror="this.src='/assets/img/usdc.png'" alt="USDC" class="w-3.5 h-3.5 rounded-full inline">
+              <img src="/assets/img/usdc.png" onerror="this.src='/assets/img/usdc.png'" alt="USDC" class="w-3.5 h-3.5 rounded-full inline">
               Hot Wallet USDC
             </div>
             <div class="text-xl font-black text-white font-mono mt-1">15,420.00 <span class="text-xs text-slate-400 font-normal">USDC</span></div>
@@ -879,7 +862,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
                   <td class="py-3 px-3">alex@undo.sol</td>
                   <td class="py-3 px-3 font-bold text-white">
                     <span class="inline-flex items-center gap-1">
-                      <img src="https://cryptologos.cc/logos/solana-sol-logo.png" onerror="this.src='/assets/img/sol.png'" alt="SOL" class="w-3.5 h-3.5 rounded-full inline">
+                      <img src="/assets/img/sol.png" onerror="this.src='/assets/img/sol.png'" alt="SOL" class="w-3.5 h-3.5 rounded-full inline">
                       0.75 SOL
                     </span>
                   </td>
@@ -892,7 +875,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
                   <td class="py-3 px-3">alex@undo.sol</td>
                   <td class="py-3 px-3 font-bold text-white">
                     <span class="inline-flex items-center gap-1">
-                      <img src="https://cryptologos.cc/logos/usd-coin-usdc-logo.png" onerror="this.src='/assets/img/usdc.png'" alt="USDC" class="w-3.5 h-3.5 rounded-full inline">
+                      <img src="/assets/img/usdc.png" onerror="this.src='/assets/img/usdc.png'" alt="USDC" class="w-3.5 h-3.5 rounded-full inline">
                       50.00 USDC
                     </span>
                   </td>
@@ -1291,7 +1274,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
         <div class="p-4 rounded-2xl bg-black/50 border border-white/10 shadow-inner">
           <div class="flex items-center justify-center gap-3">
             <img id="receiptTokenLogo"
-                 src="https://cryptologos.cc/logos/solana-sol-logo.png"
+                 src="/assets/img/sol.png"
                  onerror="this.src='/assets/img/sol.png'"
                  alt="Token"
                  class="w-10 h-10 rounded-full object-contain p-1 bg-black/60 border border-white/15 shrink-0 shadow-md">

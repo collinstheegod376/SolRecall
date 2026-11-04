@@ -231,6 +231,7 @@ class TransferService
                 );
                 $humanDuration = self::formatHumanDuration($windowMinutes);
                 $totalDeducted = ($token === 'SOL') ? round($amount + $platformFee + $gasFee, 6) : round($amount + $platformFee, 6);
+                self::invalidateBalanceCache($userId);
 
                 return [
                     'success' => true,
@@ -349,6 +350,8 @@ class TransferService
                     [$gasFee, (int) $transfer['user_id'], 'SOL']
                 );
             }
+
+            self::invalidateBalanceCache($userId);
 
             return [
                 'success' => true,
@@ -609,10 +612,141 @@ class TransferService
     }
 
     /**
-     * Fetch user balances across all supported tokens.
+     * Invalidate session micro-cache for user balances and bootstrap data.
      */
-    public function getUserBalances(int $userId): array
+    public static function invalidateBalanceCache(int $userId): void
     {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            unset(
+                $_SESSION['cached_balances'][$userId],
+                $_SESSION['cached_balances_time'][$userId],
+                $_SESSION['cached_bootstrap'][$userId],
+                $_SESSION['cached_bootstrap_time'][$userId]
+            );
+        }
+    }
+
+    /**
+     * Consolidate bootstrap data (user details, multi-token balances, active pending holds,
+     * transfer history, and threshold settings) in a single remote database round-trip.
+     */
+    public function getBootstrapData(int $userId, bool $forceFresh = false): array
+    {
+        $now = time();
+        $ttl = 12; // 12-second session micro-cache
+
+        if (session_status() === PHP_SESSION_ACTIVE && !$forceFresh) {
+            if (
+                isset($_SESSION['cached_bootstrap'][$userId], $_SESSION['cached_bootstrap_time'][$userId]) &&
+                ($now - (int) $_SESSION['cached_bootstrap_time'][$userId] < $ttl)
+            ) {
+                return $_SESSION['cached_bootstrap'][$userId];
+            }
+        }
+
+        $sql = "SELECT 
+          (SELECT json_agg(b) FROM (SELECT token, available, escrow FROM user_balances WHERE user_id = :uid) b) AS balances,
+          (SELECT json_agg(p) FROM (SELECT * FROM pending_transfers WHERE user_id = :uid AND status = 'pending' ORDER BY expires_at ASC) p) AS pending,
+          (SELECT json_agg(h) FROM (SELECT * FROM pending_transfers WHERE user_id = :uid ORDER BY created_at DESC LIMIT 30) h) AS history,
+          (SELECT row_to_json(u) FROM (SELECT id, username, email, solana_deposit_address, two_factor_enabled, is_admin FROM users WHERE id = :uid) u) AS user";
+
+        $row = $this->db->fetch($sql, ['uid' => $userId]);
+
+        $userData = !empty($row['user']) ? json_decode((string)$row['user'], true) : [];
+        $rawBalances = !empty($row['balances']) ? json_decode((string)$row['balances'], true) : [];
+        $rawPending = !empty($row['pending']) ? json_decode((string)$row['pending'], true) : [];
+        $rawHistory = !empty($row['history']) ? json_decode((string)$row['history'], true) : [];
+
+        $tokens = $this->getThresholds();
+        $balanceMap = [];
+        foreach ($rawBalances as $b) {
+            $balanceMap[$b['token']] = [
+                'available' => (float) $b['available'],
+                'escrow' => (float) $b['escrow'],
+                'total' => (float) $b['available'] + (float) $b['escrow'],
+            ];
+        }
+
+        $formattedBalances = [];
+        foreach ($tokens as $sym => $meta) {
+            $avail = $balanceMap[$sym]['available'] ?? 0.0;
+            $escrow = $balanceMap[$sym]['escrow'] ?? 0.0;
+            $formattedBalances[$sym] = [
+                'token' => $sym,
+                'name' => $meta['name'],
+                'available' => $avail,
+                'escrow' => $escrow,
+                'total' => $avail + $escrow,
+                'threshold' => $meta['threshold'],
+                'decimals' => $meta['decimals'],
+                'price' => $sym === 'SOL' ? 185.0 : 1.0,
+            ];
+        }
+
+        $pendingTransfers = array_map(function ($item) {
+            $item['amount'] = (float) $item['amount'];
+            return $item;
+        }, $rawPending);
+
+        $historyTransfers = array_map(function ($item) {
+            $item['amount'] = (float) $item['amount'];
+            return $item;
+        }, $rawHistory);
+
+        $thresholds = [];
+        foreach ($tokens as $sym => $meta) {
+            $thresholds[$sym] = $meta['threshold'];
+        }
+
+        $result = [
+            'user' => $userData,
+            'balances' => $formattedBalances,
+            'pending' => $pendingTransfers,
+            'history' => $historyTransfers,
+            'thresholds' => $thresholds,
+            'settings' => [
+                'undoWindowMinutes' => 10,
+            ],
+            'server_time' => $now,
+        ];
+
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            if (!isset($_SESSION['cached_bootstrap'])) {
+                $_SESSION['cached_bootstrap'] = [];
+                $_SESSION['cached_bootstrap_time'] = [];
+            }
+            $_SESSION['cached_bootstrap'][$userId] = $result;
+            $_SESSION['cached_bootstrap_time'][$userId] = $now;
+
+            // Also synchronize cached_balances
+            if (!isset($_SESSION['cached_balances'])) {
+                $_SESSION['cached_balances'] = [];
+                $_SESSION['cached_balances_time'] = [];
+            }
+            $_SESSION['cached_balances'][$userId] = $formattedBalances;
+            $_SESSION['cached_balances_time'][$userId] = $now;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Fetch user balances across all supported tokens (with 12s session micro-cache).
+     */
+    public function getUserBalances(int $userId, bool $forceFresh = false): array
+    {
+        $now = time();
+        $ttl = 12; // 12-second micro-cache
+
+        if (session_status() === PHP_SESSION_ACTIVE && !$forceFresh) {
+            if (
+                isset($_SESSION['cached_balances'][$userId], $_SESSION['cached_balances_time'][$userId]) &&
+                ($now - (int) $_SESSION['cached_balances_time'][$userId] < $ttl)
+            ) {
+                return $_SESSION['cached_balances'][$userId];
+            }
+        }
+
         $tokens = $this->getThresholds();
         $rows = $this->db->fetchAll('SELECT token, available, escrow FROM user_balances WHERE user_id = ?', [$userId]);
 
@@ -637,7 +771,17 @@ class TransferService
                 'total' => $avail + $escrow,
                 'threshold' => $meta['threshold'],
                 'decimals' => $meta['decimals'],
+                'price' => $sym === 'SOL' ? 185.0 : 1.0,
             ];
+        }
+
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            if (!isset($_SESSION['cached_balances'])) {
+                $_SESSION['cached_balances'] = [];
+                $_SESSION['cached_balances_time'] = [];
+            }
+            $_SESSION['cached_balances'][$userId] = $result;
+            $_SESSION['cached_balances_time'][$userId] = $now;
         }
 
         return $result;

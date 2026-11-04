@@ -40,9 +40,9 @@
 
   // Supported Token Logos Map
   const tokenLogos = {
-    SOL: { url: 'https://cryptologos.cc/logos/solana-sol-logo.png', local: '/assets/img/sol.png' },
-    USDC: { url: 'https://cryptologos.cc/logos/usd-coin-usdc-logo.png', local: '/assets/img/usdc.png' },
-    USDT: { url: 'https://cryptologos.cc/logos/tether-usdt-logo.png', local: '/assets/img/usdt.png' }
+    SOL: { url: '/assets/img/sol.png', local: '/assets/img/sol.png' },
+    USDC: { url: '/assets/img/usdc.png', local: '/assets/img/usdc.png' },
+    USDT: { url: '/assets/img/usdt.png', local: '/assets/img/usdt.png' }
   };
 
   // Toast Notification System
@@ -890,9 +890,9 @@
       const formTokenLogo = document.getElementById('formTokenLogo');
       if (formTokenLogo) {
         const logoMap = {
-          SOL: { url: 'https://cryptologos.cc/logos/solana-sol-logo.png', local: '/assets/img/sol.png' },
-          USDC: { url: 'https://cryptologos.cc/logos/usd-coin-usdc-logo.png', local: '/assets/img/usdc.png' },
-          USDT: { url: 'https://cryptologos.cc/logos/tether-usdt-logo.png', local: '/assets/img/usdt.png' }
+          SOL: { url: '/assets/img/sol.png', local: '/assets/img/sol.png' },
+          USDC: { url: '/assets/img/usdc.png', local: '/assets/img/usdc.png' },
+          USDT: { url: '/assets/img/usdt.png', local: '/assets/img/usdt.png' }
         };
         const info = logoMap[token] || logoMap.SOL;
         formTokenLogo.src = info.url;
@@ -2143,7 +2143,28 @@
     // 1. Setup tabs immediately so buttons are responsive right away
     try { setupTabs(); } catch (e) { console.error('setupTabs error:', e); }
 
-    // Synchronous SSR Hydration: immediately populate state & render to eliminate zero-flicker on refresh
+    // 2. Client-Side SWR (Stale-While-Revalidate) Cache via localStorage:
+    // Paint cached values in 0ms on initial load
+    try {
+      const swrCached = localStorage.getItem('solrecall_swr_cache');
+      if (swrCached) {
+        const cached = JSON.parse(swrCached);
+        if (cached && typeof cached === 'object') {
+          if (cached.user) AppState.user = cached.user;
+          if (cached.balances) AppState.balances = cached.balances;
+          if (Array.isArray(cached.pendingTransfers)) AppState.pendingTransfers = cached.pendingTransfers;
+          if (Array.isArray(cached.historyTransfers)) AppState.historyTransfers = cached.historyTransfers;
+          if (cached.settings) AppState.settings = cached.settings;
+          renderHeaderAndBalances();
+          renderPendingTransfers();
+          renderHistoryTable();
+        }
+      }
+    } catch (e) {
+      console.warn('SWR localStorage load notice:', e.message);
+    }
+
+    // 3. Synchronous SSR Hydration: immediately populate state & render from server
     if (window.__INITIAL_STATE__) {
       try {
         if (window.__INITIAL_STATE__.user) {
@@ -2174,59 +2195,7 @@
       }
     }
 
-    // Load live user & balances from API in background (revalidates without flashing zeros)
-    try {
-      const authRes = await apiFetch('/api/auth/me');
-      if (authRes && authRes.success) {
-        const payload = authRes.data || authRes;
-        AppState.user = payload.user || payload;
-        if (payload.deposit_address && !AppState.user.solana_deposit_address) {
-          AppState.user.solana_deposit_address = payload.deposit_address;
-        }
-      }
-    } catch (e) {
-      console.warn('Initial auth fetch notice:', e.message);
-    }
-
-    try {
-      const balRes = await apiFetch('/api/transfers/balances');
-      if (balRes && balRes.success) {
-        const payload = balRes.data || balRes;
-        if (payload.balances) AppState.balances = payload.balances;
-        if (payload.thresholds) AppState.thresholds = payload.thresholds;
-        if (payload.settings) AppState.settings = payload.settings;
-      }
-    } catch (e) {
-      console.warn('Initial balances fetch notice:', e.message);
-    }
-
-    try {
-      const pendRes = await apiFetch('/api/transfers/pending');
-      if (pendRes && pendRes.success) {
-        const payload = pendRes.data || pendRes;
-        const list = payload.transfers || payload.pending || [];
-        if (Array.isArray(list)) {
-          AppState.pendingTransfers = list.filter(t => t.status === 'pending' && calculateRemainingSeconds(t) > 0);
-        }
-      }
-    } catch (e) {
-      console.warn('Initial pending fetch notice:', e.message);
-    }
-
-    try {
-      const histRes = await apiFetch('/api/transfers/history');
-      if (histRes && histRes.success) {
-        const payload = histRes.data || histRes;
-        const list = payload.transfers || payload.history || [];
-        if (Array.isArray(list)) {
-          AppState.historyTransfers = list;
-        }
-      }
-    } catch (e) {
-      console.warn('Initial history fetch notice:', e.message);
-    }
-
-    // Modal click-outside dismissal
+    // 4. Modal click-outside dismissal
     const receiptModal = document.getElementById('transferReceiptModal');
     if (receiptModal) {
       receiptModal.addEventListener('click', (e) => {
@@ -2246,6 +2215,63 @@
     try { setupHistoryListeners(); } catch (e) { console.error('Error setting up history listeners:', e); }
     try { setupSettings(); } catch (e) { console.error('Error setting up settings:', e); }
     try { startTicker(); } catch (e) { console.error('Error starting ticker:', e); }
+
+    // 5. Consolidated Single Bootstrap Endpoint (/api/dashboard/bootstrap)
+    // Runs in background with SWR: only updates UI and localStorage if numbers changed!
+    (async () => {
+      try {
+        const bootRes = await apiFetch('/api/dashboard/bootstrap');
+        if (bootRes && bootRes.success && bootRes.data) {
+          const d = bootRes.data;
+          let changed = false;
+
+          if (d.user && JSON.stringify(d.user) !== JSON.stringify(AppState.user)) {
+            AppState.user = d.user;
+            changed = true;
+          }
+          if (d.balances && JSON.stringify(d.balances) !== JSON.stringify(AppState.balances)) {
+            AppState.balances = d.balances;
+            changed = true;
+          }
+          if (Array.isArray(d.pending)) {
+            const freshPending = d.pending.filter(t => t.status === 'pending' && calculateRemainingSeconds(t) > 0);
+            if (JSON.stringify(freshPending) !== JSON.stringify(AppState.pendingTransfers)) {
+              AppState.pendingTransfers = freshPending;
+              changed = true;
+            }
+          }
+          if (Array.isArray(d.history) && JSON.stringify(d.history) !== JSON.stringify(AppState.historyTransfers)) {
+            AppState.historyTransfers = d.history;
+            changed = true;
+          }
+          if (d.thresholds) {
+            AppState.thresholds = d.thresholds;
+          }
+
+          if (changed) {
+            renderHeaderAndBalances();
+            renderPendingTransfers();
+            renderHistoryTable();
+          }
+
+          // Persist fresh data to SWR localStorage cache
+          try {
+            localStorage.setItem('solrecall_swr_cache', JSON.stringify({
+              user: AppState.user,
+              balances: AppState.balances,
+              pendingTransfers: AppState.pendingTransfers,
+              historyTransfers: AppState.historyTransfers,
+              settings: AppState.settings,
+              timestamp: Date.now()
+            }));
+          } catch (e) {
+            // Ignore localStorage quota errors
+          }
+        }
+      } catch (e) {
+        console.warn('Bootstrap SWR notice:', e.message);
+      }
+    })();
   }
 
   // DOM Ready

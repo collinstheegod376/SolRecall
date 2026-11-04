@@ -44,5 +44,6 @@ return [
         // Crucial for Supabase transaction pooler (port 6543): prevents "prepared statement does not exist" errors
         PDO::ATTR_EMULATE_PREPARES => true,
         PDO::ATTR_STRINGIFY_FETCHES => false,
+        PDO::ATTR_PERSISTENT => true,
     ],
 ];
