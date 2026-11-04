@@ -3,7 +3,7 @@
 ### The First Open-Source, Time-Locked Reversible Escrow Layer on Solana
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
-[![Solana Devnet](https://img.shields.io/badge/Solana-Devnet-14F195?style=for-the-badge&logo=solana&logoColor=black)](https://solana.com)
+[![Solana Mainnet](https://img.shields.io/badge/Solana-Mainnet-14F195?style=for-the-badge&logo=solana&logoColor=black)](https://solana.com)
 [![PHP 8.3](https://img.shields.io/badge/PHP-8.3-777BB4?style=for-the-badge&logo=php&logoColor=white)](https://www.php.net)
 [![Supabase PostgreSQL](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
 [![PWA Enabled](https://img.shields.io/badge/PWA-Enabled-5A0FC8?style=for-the-badge&logo=pwa&logoColor=white)](#-core-features)
@@ -21,7 +21,7 @@ Blockchain transactions are notoriously immutable—one mistyped character, mali
 **SolRecall** solves this fundamental safety issue by introducing an autonomous, time-locked escrow grace buffer:
 1. When a user sends funds below configured small-transfer thresholds (e.g. $\le 2$ SOL, $\le 100$ USDC/USDT), the transaction enters an active **Undo Window**.
 2. During this window, the sender has complete autonomy to click **Undo Transfer** to cancel the transfer and instantly refund 100% of escrowed funds back to their available balance.
-3. If the window elapses without cancellation, SolRecall's automated, resilient broadcaster signs and broadcasts the wire transaction directly to the **Solana Devnet** cluster for permanent on-chain settlement.
+3. If the window elapses without cancellation, SolRecall's automated, resilient broadcaster signs and broadcasts the wire transaction directly to the **Solana Mainnet** cluster for permanent on-chain settlement.
 
 ---
 
@@ -52,7 +52,7 @@ flowchart TD
     E -->|"Instant 100% balance return"| C
 
     D -->|"Option B: Timelock Countdown Expires (Grace window elapsed)"| F["Settlement Daemon (deposit_watcher.php)"]
-    F -->|"Signs wire transaction with Ed25519 key"| G["Broadcast to Solana Devnet"]
+    F -->|"Signs wire transaction with Ed25519 key"| G["Broadcast to Solana Mainnet"]
     G -->|"Confirmed on-chain"| H["Finalized Recipient Settlement"]
 
     subgraph EscrowLayer ["SolRecall Safety Layer"]
@@ -75,7 +75,7 @@ flowchart TD
 | **Held in Escrow** | `pending` | Transfer created; funds moved from `available` to `escrow` balance. Countdown timer active. |
 | **Cancelled / Refunded** | `cancelled` | Sender clicked **Undo**. Funds immediately unlocked and restored to `available` balance. |
 | **Broadcasting** | `processing` | Undo window expired. Broadcast daemon acquired row-level lock and is signing wire transaction. |
-| **Completed** | `completed` | Transaction broadcasted and confirmed on Solana Devnet. `tx_signature` recorded. |
+| **Completed** | `completed` | Transaction broadcasted and confirmed on Solana Mainnet. `tx_signature` recorded. |
 | **Failed** | `failed` | Network or RPC failure during broadcast. Escrow refunded to user; `failure_reason` logged. |
 
 ---
@@ -197,10 +197,14 @@ DB_USERNAME=postgres.[YOUR_PROJECT_REF]
 DB_PASSWORD=[YOUR_PASSWORD]
 DB_SSLMODE=require
 
-# Solana Devnet RPC
-SOLANA_CLUSTER=devnet
-SOLANA_RPC_URL=https://api.devnet.solana.com
+# Solana Mainnet RPC
+SOLANA_CLUSTER=mainnet-beta
+SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
 SOLANA_COMMITMENT=confirmed
+
+# SPL Token Mint Addresses (Solana Mainnet official mints)
+SOLANA_TOKEN_MINT_USDC=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
+SOLANA_TOKEN_MINT_USDT=Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB
 
 # Undo Window Thresholds
 DEFAULT_UNDO_WINDOW_MINUTES=10
@@ -257,7 +261,7 @@ Open your browser to:
 ### 6. Run the Unified Deposit & Broadcast Watcher Daemon
 
 SolRecall includes an automated background worker in `cron/deposit_watcher.php`. It handles two operations in a single resilient loop:
-1. **Deposit Detection**: Scans users' custodial deposit addresses on Solana Devnet for incoming SOL, USDC, and USDT, atomically crediting available balances.
+1. **Deposit Detection**: Scans users' custodial deposit addresses on Solana Mainnet for incoming SOL, USDC, and USDT, atomically crediting available balances.
 2. **Expired Timelock Settlement**: Identifies pending transfers whose undo windows have elapsed, builds and signs Ed25519 wire transactions, and broadcasts them on-chain.
 
 #### Single One-Off Execution:
@@ -272,7 +276,7 @@ php cron/deposit_watcher.php --poll --interval=10
 ```
 
 #### Local Sandbox Simulation Mode:
-Test deposit detection and auto-broadcasting locally without spending Devnet SOL:
+Test deposit detection and auto-broadcasting locally without spending Mainnet SOL:
 ```bash
 php cron/deposit_watcher.php --poll --interval=5 --simulate
 ```
@@ -290,8 +294,8 @@ php tests/test_integration.php
 # 2. Cryptographic Security & 2FA Engine (Ed25519, AES-256-GCM, TOTP)
 php tests/test_auth_and_2fa.php
 
-# 3. Live Solana Devnet Cluster Connectivity
-php tests/test_live_devnet.php
+# 3. Live Solana Mainnet Cluster Connectivity
+php tests/test_live_mainnet.php
 
 # 4. Supabase Live Pooler Database Tests
 php tests/test_supabase_live.php

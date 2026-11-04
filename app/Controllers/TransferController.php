@@ -276,7 +276,7 @@ class TransferController
             return Response::success([
                 'credited' => $credited,
                 'balances' => $balances,
-            ], "Synced with Solana Devnet. {$credited} new deposit(s) credited.");
+            ], "Synced with Solana Mainnet. {$credited} new deposit(s) credited.");
         } catch (Throwable $e) {
             return Response::error('Failed to sync deposits: ' . $e->getMessage(), 500);
         }

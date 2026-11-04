@@ -1559,7 +1559,7 @@
       // Explorer link: links to tx signature on Solscan if broadcast, or destination account on Solscan if pending escrow hold
       let explorerHtml = `<span class="text-slate-500 text-xs">—</span>`;
       if (t.tx_signature) {
-        const explorerUrl = `https://solscan.io/tx/${t.tx_signature}?cluster=devnet`;
+        const explorerUrl = `https://solscan.io/tx/${t.tx_signature}`;
         explorerHtml = `
           <a href="${explorerUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 font-mono transition" title="View on Solscan">
             <span>${truncateAddress(t.tx_signature, 4, 4)}</span>
@@ -1567,7 +1567,7 @@
           </a>
         `;
       } else if (t.status === 'pending') {
-        const explorerUrl = `https://solscan.io/account/${t.destination}?cluster=devnet`;
+        const explorerUrl = `https://solscan.io/account/${t.destination}`;
         explorerHtml = `
           <a href="${explorerUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 font-mono transition" title="View recipient address on Solscan">
             <span>Escrow Hold</span>
@@ -2129,7 +2129,7 @@
       hwAddrEl.title = addr;
     }
     if (hwLinkEl && hw.address) {
-      hwLinkEl.href = `https://explorer.solana.com/address/${hw.address}?cluster=devnet`;
+      hwLinkEl.href = `https://explorer.solana.com/address/${hw.address}`;
     }
 
     // Active escrow card
@@ -2296,7 +2296,7 @@
   window.adminForceCancel = adminForceCancel;
 
   async function adminForceBroadcast(transferId) {
-    if (!confirm(`Are you sure you want to FORCE-BROADCAST transfer #${transferId} immediately on Solana Devnet?\n\nThis will bypass any remaining timelock window and submit the transaction on-chain.`)) {
+    if (!confirm(`Are you sure you want to FORCE-BROADCAST transfer #${transferId} immediately on Solana Mainnet?\n\nThis will bypass any remaining timelock window and submit the transaction on-chain.`)) {
       return;
     }
 

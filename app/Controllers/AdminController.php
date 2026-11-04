@@ -136,7 +136,7 @@ class AdminController extends Controller
             'hot_wallet' => [
                 'address' => $hotWalletAddress,
                 'sol_balance' => $hotWalletSol,
-                'network' => config('solana.cluster', 'devnet'),
+                'network' => config('solana.cluster', 'mainnet-beta'),
                 'status' => 'healthy'
             ],
             'active_escrow' => $activeEscrow,
@@ -409,7 +409,7 @@ class AdminController extends Controller
             TransferService::invalidateBalanceCache($userId);
 
             return Response::success([
-                'message' => "Transfer #{$transferId} successfully broadcast on Solana Devnet.",
+                'message' => "Transfer #{$transferId} successfully broadcast on Solana Mainnet.",
                 'tx_signature' => $txSignature
             ]);
         } catch (\Throwable $e) {

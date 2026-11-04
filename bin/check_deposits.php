@@ -30,7 +30,7 @@ foreach ($users as $u) {
         try {
             $sol = $rpc->getBalance($addr);
             $lamports = (int) round($sol * 1_000_000_000);
-            echo "On-Chain Solana Devnet Balance: {$sol} SOL ({$lamports} lamports)\n";
+            echo "On-Chain Solana Mainnet Balance: {$sol} SOL ({$lamports} lamports)\n";
         } catch (\Throwable $e) {
             echo "Error checking on-chain balance: " . $e->getMessage() . "\n";
         }

@@ -848,14 +848,14 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
                 <img src="/assets/img/sol.png" onerror="this.src='/assets/img/sol.png'" alt="SOL" class="w-3.5 h-3.5 rounded-full inline">
                 Hot Wallet SOL
               </span>
-              <span class="w-2 h-2 rounded-full bg-emerald-400" title="Connected to Solana Devnet"></span>
+              <span class="w-2 h-2 rounded-full bg-emerald-400" title="Connected to Solana Mainnet"></span>
             </div>
             <div class="text-2xl font-black text-white font-mono mt-1" id="adminHotWalletSol">
               0.0000 <span class="text-xs text-slate-400 font-normal">SOL</span>
             </div>
             <div class="text-[11px] text-slate-400 mt-1.5 flex items-center justify-between">
               <span id="adminHotWalletAddrShort" class="font-mono text-purple-300 truncate max-w-[130px]">Loading...</span>
-              <a id="adminHotWalletExplorerLink" href="https://explorer.solana.com/?cluster=devnet" target="_blank" rel="noopener" class="text-purple-400 hover:text-purple-300 hover:underline">Explorer ↗</a>
+              <a id="adminHotWalletExplorerLink" href="https://explorer.solana.com/" target="_blank" rel="noopener" class="text-purple-400 hover:text-purple-300 hover:underline">Explorer ↗</a>
             </div>
           </div>
 

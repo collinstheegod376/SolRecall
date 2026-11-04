@@ -33,7 +33,7 @@ class SolanaRpcService
         int $timeout = 10,
         ?bool $simulationMode = null
     ) {
-        $this->rpcUrl = $rpcUrl ?? (string) config('solana.rpc_url', 'https://api.devnet.solana.com');
+        $this->rpcUrl = $rpcUrl ?? (string) config('solana.rpc_url', 'https://api.mainnet-beta.solana.com');
         $this->commitment = $commitment ?? (string) config('solana.commitment', 'confirmed');
         $this->timeout = $timeout;
 

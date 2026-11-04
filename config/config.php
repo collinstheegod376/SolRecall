@@ -32,8 +32,8 @@ return [
     'database' => $databaseConfig,
 
     'solana' => [
-        'cluster' => (string) $env('SOLANA_CLUSTER', 'devnet'),
-        'rpc_url' => (string) $env('SOLANA_RPC_URL', 'https://api.devnet.solana.com'),
+        'cluster' => (string) $env('SOLANA_CLUSTER', 'mainnet-beta'),
+        'rpc_url' => (string) $env('SOLANA_RPC_URL', 'https://api.mainnet-beta.solana.com'),
         'commitment' => (string) $env('SOLANA_COMMITMENT', 'confirmed'),
         'hot_wallet_pubkey' => (string) $env('SOLANA_HOT_WALLET_PUBKEY', ''),
         'hot_wallet_private_key' => (string) $env('SOLANA_HOT_WALLET_PRIVATE_KEY', ''),
@@ -54,7 +54,7 @@ return [
             'name' => 'USD Coin',
             'decimals' => 6,
             'is_native' => false,
-            'mint' => (string) $env('SOLANA_TOKEN_MINT_USDC', '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'),
+            'mint' => (string) $env('SOLANA_TOKEN_MINT_USDC', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'),
             'threshold' => (float) $env('THRESHOLD_USDC', 100.0),
             'icon' => 'usdc',
         ],
@@ -63,7 +63,7 @@ return [
             'name' => 'Tether USD',
             'decimals' => 6,
             'is_native' => false,
-            'mint' => (string) $env('SOLANA_TOKEN_MINT_USDT', 'EJwZgeZrdCraqiSCdtXYWhWsvQTxZeQXP3ZvGWcvppgw'),
+            'mint' => (string) $env('SOLANA_TOKEN_MINT_USDT', 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'),
             'threshold' => (float) $env('THRESHOLD_USDT', 100.0),
             'icon' => 'usdt',
         ],
