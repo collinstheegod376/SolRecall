@@ -654,7 +654,7 @@
 
     // Update SWR cache in localStorage
     try {
-      localStorage.setItem('solrecall_swr_cache', JSON.stringify({
+      localStorage.setItem('solrecall_swr_cache_v2', JSON.stringify({
         user: AppState.user,
         balances: AppState.balances,
         pendingTransfers: AppState.pendingTransfers,
@@ -2452,7 +2452,9 @@
     // 2. Client-Side SWR (Stale-While-Revalidate) Cache via localStorage:
     // Paint cached values in 0ms on initial load
     try {
-      const swrCached = localStorage.getItem('solrecall_swr_cache');
+      // Purge legacy devnet cache if present
+      localStorage.removeItem('solrecall_swr_cache');
+      const swrCached = localStorage.getItem('solrecall_swr_cache_v2');
       if (swrCached) {
         const cached = JSON.parse(swrCached);
         if (cached && typeof cached === 'object') {
@@ -2564,7 +2566,7 @@
 
           // Persist fresh data to SWR localStorage cache
           try {
-            localStorage.setItem('solrecall_swr_cache', JSON.stringify({
+            localStorage.setItem('solrecall_swr_cache_v2', JSON.stringify({
               user: AppState.user,
               balances: AppState.balances,
               pendingTransfers: AppState.pendingTransfers,
