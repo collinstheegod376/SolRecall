@@ -600,15 +600,21 @@
     if (!transfer.expires_at) return 0;
 
     let isoStr = String(transfer.expires_at).trim();
-    if (!isoStr.endsWith('Z') && isoStr.indexOf('+') === -1) {
-      isoStr = isoStr.replace(' ', 'T') + 'Z';
+    // Normalize date string across all engines (Chrome, Firefox, Safari/iOS)
+    isoStr = isoStr.replace(' ', 'T');
+    if (isoStr.endsWith('+00')) {
+      isoStr = isoStr.slice(0, -3) + 'Z';
+    } else if (isoStr.includes('+00:00')) {
+      isoStr = isoStr.replace('+00:00', 'Z');
+    } else if (!isoStr.endsWith('Z') && !isoStr.includes('+')) {
+      isoStr += 'Z';
     }
     const expiresMs = new Date(isoStr).getTime();
     if (isNaN(expiresMs)) return 0;
     return Math.max(0, Math.floor((expiresMs - Date.now()) / 1000));
   }
 
-  // Instantly dissolve expired hold card with smooth fade-out and DOM removal within 500ms
+  // Instantly dissolve expired hold card with smooth fade-out and DOM removal within 350ms
   function dissolveExpiredTransfer(transfer) {
     if (!transfer) return;
     const transferId = transfer.id;
@@ -617,12 +623,12 @@
     if (cardEl) {
       // Instantly apply a smooth fade-out CSS animation (opacity 0, scale 0.95)
       cardEl.classList.add('card-dissolve');
-      cardEl.style.transition = 'opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), max-height 0.45s ease, margin 0.45s ease, padding 0.45s ease';
+      cardEl.style.transition = 'opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), max-height 0.35s ease, margin 0.35s ease, padding 0.35s ease';
       cardEl.style.opacity = '0';
       cardEl.style.transform = 'scale(0.95)';
       cardEl.style.pointerEvents = 'none';
 
-      // Remove from DOM within 500ms
+      // Remove from DOM within 350ms
       setTimeout(() => {
         if (cardEl && cardEl.parentNode) {
           cardEl.remove();
@@ -632,7 +638,7 @@
         if (container && (!container.children || container.children.length === 0) && emptyState) {
           emptyState.classList.remove('hidden');
         }
-      }, 450);
+      }, 350);
     }
 
     // Update AppState.pendingTransfers to remove the expired transfer immediately
@@ -646,25 +652,34 @@
       emptyState.classList.remove('hidden');
     }
 
-    // Trigger apiFetch('/api/transfers/pending') and apiFetch('/api/transfers/balances') in background to sync database state
-    apiFetch('/api/cron').catch(() => {});
-    apiFetch('/api/transfers/pending').then(pRes => {
-      if (pRes && pRes.success) {
-        const payload = pRes.data || pRes;
-        const fresh = payload.transfers || payload.pending || [];
-        AppState.pendingTransfers = fresh.filter(item => item.status === 'pending' && calculateRemainingSeconds(item) > 0);
-        renderPendingTransfers();
-        renderHeaderAndBalances();
-      }
-    }).catch(e => console.debug('Pending sync notice:', e));
+    // Update SWR cache in localStorage
+    try {
+      localStorage.setItem('solrecall_swr_cache', JSON.stringify({
+        user: AppState.user,
+        balances: AppState.balances,
+        pendingTransfers: AppState.pendingTransfers,
+        historyTransfers: AppState.historyTransfers,
+        settings: AppState.settings,
+        timestamp: Date.now()
+      }));
+    } catch (e) {}
 
-    apiFetch('/api/transfers/balances').then(bRes => {
-      if (bRes && bRes.success) {
-        const payload = bRes.data || bRes;
-        if (payload.balances) AppState.balances = payload.balances;
+    // Trigger consolidated bootstrap sync to settle state with server
+    apiFetch('/api/cron').catch(() => {});
+    apiFetch('/api/dashboard/bootstrap').then(bRes => {
+      if (bRes && bRes.success && bRes.data) {
+        if (bRes.data.balances) AppState.balances = bRes.data.balances;
+        if (Array.isArray(bRes.data.pending)) {
+          AppState.pendingTransfers = bRes.data.pending.filter(item => item.status === 'pending' && calculateRemainingSeconds(item) > 0);
+        }
+        if (Array.isArray(bRes.data.history)) {
+          AppState.historyTransfers = bRes.data.history;
+        }
         renderHeaderAndBalances();
+        renderPendingTransfers();
+        renderHistoryTable();
       }
-    }).catch(e => console.debug('Balances sync notice:', e));
+    }).catch(e => console.debug('Expired sync notice:', e));
   }
   window.dissolveExpiredTransfer = dissolveExpiredTransfer;
 
@@ -1017,7 +1032,7 @@
       // Button loading state & Full-fidelity loading modal
       if (submitBtn) submitBtn.disabled = true;
       if (submitBtnSpinner) submitBtnSpinner.classList.remove('hidden');
-      if (submitBtnText) submitBtnText.textContent = 'Securing into Undo Window...';
+      if (submitBtnText) submitBtnText.textContent = 'Initiating Escrow...';
 
       const windowMinutes = getSelectedWindowMinutes();
       openTransferLoadingModal({ token, amount, destination, windowMinutes, note });
@@ -2152,7 +2167,9 @@
         if (cached && typeof cached === 'object') {
           if (cached.user) AppState.user = cached.user;
           if (cached.balances) AppState.balances = cached.balances;
-          if (Array.isArray(cached.pendingTransfers)) AppState.pendingTransfers = cached.pendingTransfers;
+          if (Array.isArray(cached.pendingTransfers)) {
+            AppState.pendingTransfers = cached.pendingTransfers.filter(t => t.status === 'pending' && calculateRemainingSeconds(t) > 0);
+          }
           if (Array.isArray(cached.historyTransfers)) AppState.historyTransfers = cached.historyTransfers;
           if (cached.settings) AppState.settings = cached.settings;
           renderHeaderAndBalances();

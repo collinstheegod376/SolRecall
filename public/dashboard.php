@@ -3,6 +3,11 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Anti-cache headers to prevent browser from serving stale session or shell assets
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
+
 // Enforce authenticated session
 if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
     header('Location: /login.php');
@@ -1426,11 +1431,13 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
   </script>
   <script src="/assets/js/dashboard.js?v=<?= file_exists(__DIR__ . '/assets/js/dashboard.js') ? filemtime(__DIR__ . '/assets/js/dashboard.js') : '1.1' ?>"></script>
 
-  <!-- PWA Service Worker Registration -->
+  <!-- PWA Service Worker Registration & Cache Sync -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch((err) => {
+        navigator.serviceWorker.register('/sw.js').then((reg) => {
+          reg.update();
+        }).catch((err) => {
           console.warn('[SolRecall] Service Worker registration failed:', err);
         });
       });
