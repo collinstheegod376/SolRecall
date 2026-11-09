@@ -3,7 +3,7 @@
  * Reversible Time-Locked Escrow on Solana
  */
 
-const CACHE_NAME = 'solrecall-v5';
+const CACHE_NAME = 'solrecall-v6';
 
 const STATIC_SHELL_ASSETS = [
   '/manifest.json',

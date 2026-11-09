@@ -84,6 +84,18 @@
   }
   window.showToast = showToast;
 
+  // Early global handler for 1-tap asset switcher (works even before DOMContentLoaded)
+  window.selectTransferToken = function(tok) {
+    if (!tok) tok = 'SOL';
+    tok = tok.toUpperCase();
+    const sel = document.getElementById('transferToken');
+    if (sel) {
+      sel.value = tok;
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  };
+  window.setSelectedToken = window.selectTransferToken;
+
   // Copy to Clipboard Helper (Supports Secure Context, Textarea Fallback, and Prompt)
   async function copyToClipboard(text, label = 'Address') {
     if (!text || typeof text !== 'string' || !text.trim()) {
@@ -357,6 +369,7 @@
   // Render Header & Balances
   function renderHeaderAndBalances() {
     const user = AppState.user;
+    const balances = AppState.balances || {};
     if (user) {
       if (user.solana_deposit_address) {
         const depositEl = document.getElementById('userDepositAddress');
@@ -407,7 +420,6 @@
     }
 
     // Render Balance Cards
-    const balances = AppState.balances;
     const solPrice = (balances.SOL && balances.SOL.price) ? balances.SOL.price : 185.0;
 
     ['SOL', 'USDC', 'USDT'].forEach(tok => {
@@ -1135,6 +1147,17 @@
         selectTransferToken(tokenSelect.value, false);
       });
     }
+
+    // Explicit click listeners on 1-tap asset tabs
+    ['SOL', 'USDC', 'USDT'].forEach(tok => {
+      const pill = document.getElementById('pillBtn-' + tok);
+      if (pill) {
+        pill.addEventListener('click', (e) => {
+          e.preventDefault();
+          selectTransferToken(tok);
+        });
+      }
+    });
 
     if (amountInput) amountInput.addEventListener('input', updateNotice);
     if (presetSelect) {
@@ -2945,9 +2968,9 @@
     }
 
     // Initial zero-delay render
-    renderHeaderAndBalances();
-    renderPendingTransfers();
-    renderHistoryTable();
+    try { renderHeaderAndBalances(); } catch (e) { console.error('initial renderHeaderAndBalances error:', e); }
+    try { renderPendingTransfers(); } catch (e) { console.error('initial renderPendingTransfers error:', e); }
+    try { renderHistoryTable(); } catch (e) { console.error('initial renderHistoryTable error:', e); }
     if (Array.isArray(AppState.pendingTransfers) && AppState.pendingTransfers.length > 0) {
       try { startTicker(); } catch (e) { console.error('startTicker SSR error:', e); }
     }
