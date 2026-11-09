@@ -1024,6 +1024,9 @@ class TransferService
         $usdtMint = (string) config('tokens.USDT.mint', 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB');
 
         // 1. Check SPL Token Balances
+        $message = $tx['transaction']['message'] ?? [];
+        $accountKeys = $message['accountKeys'] ?? [];
+
         if (!empty($meta['postTokenBalances']) && is_array($meta['postTokenBalances'])) {
             $preMap = [];
             if (!empty($meta['preTokenBalances']) && is_array($meta['preTokenBalances'])) {
@@ -1037,7 +1040,27 @@ class TransferService
 
             foreach ($meta['postTokenBalances'] as $post) {
                 $owner = $post['owner'] ?? '';
-                if ($owner === $depositAddress) {
+                $isOwner = ($owner === $depositAddress);
+
+                // If owner is omitted by RPC node, verify via ATA pubkey
+                if (!$isOwner) {
+                    $idx = $post['accountIndex'] ?? null;
+                    if ($idx !== null && isset($accountKeys[$idx])) {
+                        $keyInfo = $accountKeys[$idx];
+                        $pub = is_array($keyInfo) ? ($keyInfo['pubkey'] ?? '') : (string) $keyInfo;
+                        $mint = $post['mint'] ?? '';
+                        if ($pub !== '' && $mint !== '') {
+                            try {
+                                $expectedAta = $this->rpcService->findAssociatedTokenAddress($depositAddress, $mint);
+                                if ($pub === $expectedAta) {
+                                    $isOwner = true;
+                                }
+                            } catch (\Throwable) {}
+                        }
+                    }
+                }
+
+                if ($isOwner) {
                     $idx = $post['accountIndex'] ?? null;
                     $preAmount = $preMap[$idx] ?? 0.0;
                     $postAmount = (float) ($post['uiTokenAmount']['uiAmount'] ?? 0.0);
@@ -1060,8 +1083,6 @@ class TransferService
         }
 
         // 2. Check Native SOL Balances
-        $message = $tx['transaction']['message'] ?? [];
-        $accountKeys = $message['accountKeys'] ?? [];
         $accountIndex = null;
 
         foreach ($accountKeys as $idx => $keyInfo) {

@@ -40,9 +40,9 @@
 
   // Supported Token Logos Map
   const tokenLogos = {
-    SOL: { url: '/assets/img/sol.png', local: '/assets/img/sol.png' },
-    USDC: { url: '/assets/img/usdc.png', local: '/assets/img/usdc.png' },
-    USDT: { url: '/assets/img/usdt.png', local: '/assets/img/usdt.png' }
+    SOL: { url: '/assets/img/sol.svg', local: '/assets/img/sol.png' },
+    USDC: { url: '/assets/img/usdc.svg', local: '/assets/img/usdc.png' },
+    USDT: { url: '/assets/img/usdt.svg', local: '/assets/img/usdt.png' }
   };
 
   // Toast Notification System
@@ -429,6 +429,24 @@
       const fiatTotal = totalTok * data.price;
       if (fiatEl) fiatEl.textContent = `≈ $${formatAmount(fiatTotal, 2)}`;
     });
+
+    // Update real-time balances inside custom token selector dropdown
+    ['SOL', 'USDC', 'USDT'].forEach(tok => {
+      const balEl = document.getElementById(`tokenMenuBal-${tok}`);
+      if (balEl && balances[tok]) {
+        const num = parseFloat(balances[tok].available) || 0;
+        balEl.textContent = formatAmount(num, tok === 'SOL' ? 4 : 2);
+      }
+    });
+
+    // Update available amount hint for currently selected token
+    const tokenSelectEl = document.getElementById('transferToken');
+    const activeTok = tokenSelectEl ? tokenSelectEl.value : 'SOL';
+    const availHintEl = document.getElementById('availableAmountHint');
+    if (availHintEl && balances[activeTok]) {
+      const num = parseFloat(balances[activeTok].available) || 0;
+      availHintEl.textContent = `Available: ${formatAmount(num, activeTok === 'SOL' ? 4 : 2)} ${activeTok}`;
+    }
 
     // Total Escrow Shield Pill with multi-token awareness
     const totalEscrowEl = document.getElementById('totalEscrowShielded');
@@ -898,12 +916,19 @@
     }, 2500);
   }
 
-  // Dynamic Transfer Form Feedback
+  // Dynamic Transfer Form Feedback & Web3 Token Dropdown Integration
   function setupTransferForm() {
     const form = document.getElementById('newTransferForm');
     if (!form) return;
 
     const tokenSelect = document.getElementById('transferToken');
+    const customTrigger = document.getElementById('customTokenTrigger');
+    const customMenu = document.getElementById('customTokenMenu');
+    const customChevron = document.getElementById('customTokenChevron');
+    const customLogo = document.getElementById('customTokenSelectedLogo');
+    const customSymbol = document.getElementById('customTokenSelectedSymbol');
+    const tokenOptions = document.querySelectorAll('.token-option');
+
     const amountInput = document.getElementById('transferAmount');
     const destInput = document.getElementById('transferDestination');
     const presetSelect = document.getElementById('transferWindowPreset');
@@ -933,10 +958,86 @@
       return parseInt(presetSelect.value, 10) || (AppState.settings.undoWindowMinutes || 10);
     }
 
+    function openCustomTokenMenu() {
+      if (!customMenu) return;
+      customMenu.classList.remove('hidden');
+      if (customTrigger) customTrigger.setAttribute('aria-expanded', 'true');
+      if (customChevron) customChevron.classList.add('rotate-180');
+    }
+
+    function closeCustomTokenMenu() {
+      if (!customMenu) return;
+      customMenu.classList.add('hidden');
+      if (customTrigger) customTrigger.setAttribute('aria-expanded', 'false');
+      if (customChevron) customChevron.classList.remove('rotate-180');
+    }
+
+    function setSelectedToken(tok, triggerEvents = true) {
+      if (!tok) tok = 'SOL';
+      tok = tok.toUpperCase();
+      if (!['SOL', 'USDC', 'USDT'].includes(tok)) tok = 'SOL';
+
+      // 1. Sync backing native select
+      if (tokenSelect) {
+        tokenSelect.value = tok;
+      }
+
+      // 2. Sync trigger button UI
+      const tLogo = tokenLogos[tok] || tokenLogos.SOL;
+      if (customLogo) {
+        customLogo.src = tLogo.url;
+        customLogo.onerror = () => { customLogo.src = tLogo.local; };
+        customLogo.alt = tok;
+        if (tok === 'SOL') {
+          customLogo.className = 'w-5 h-5 rounded-full object-contain shrink-0 p-0.5 bg-black/40 border border-purple-500/30';
+        } else if (tok === 'USDC') {
+          customLogo.className = 'w-5 h-5 rounded-full object-contain shrink-0 p-0.5 bg-black/40 border border-blue-500/30';
+        } else {
+          customLogo.className = 'w-5 h-5 rounded-full object-contain shrink-0 p-0.5 bg-black/40 border border-emerald-500/30';
+        }
+      }
+      if (customSymbol) {
+        customSymbol.textContent = tok;
+      }
+
+      // 3. Update input step & placeholder
+      if (amountInput) {
+        amountInput.step = tok === 'SOL' ? 'any' : '0.01';
+        amountInput.placeholder = tok === 'SOL' ? '0.0000' : '0.00';
+      }
+
+      // 4. Update active highlight in menu options
+      tokenOptions.forEach(opt => {
+        const optTok = opt.dataset.token;
+        const isSelected = (optTok === tok);
+        opt.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+        if (isSelected) {
+          if (tok === 'SOL') opt.className = 'token-option w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-white/10 border border-purple-500/40 transition text-left group cursor-pointer bg-purple-500/10 shadow-sm';
+          else if (tok === 'USDC') opt.className = 'token-option w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-white/10 border border-blue-500/40 transition text-left group cursor-pointer bg-blue-500/10 shadow-sm';
+          else opt.className = 'token-option w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-white/10 border border-emerald-500/40 transition text-left group cursor-pointer bg-emerald-500/10 shadow-sm';
+        } else {
+          opt.className = 'token-option w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-white/10 border border-transparent transition text-left group cursor-pointer';
+        }
+      });
+
+      // 5. Close dropdown
+      closeCustomTokenMenu();
+
+      // 6. Recalculate fees, available balance hint, and preview notices
+      updateNotice();
+
+      // 7. Fire standard events for complete backward compatibility
+      if (triggerEvents && tokenSelect) {
+        tokenSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        tokenSelect.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    }
+    window.setSelectedToken = setSelectedToken;
+
     function updateNotice() {
       const token = tokenSelect ? tokenSelect.value : 'SOL';
       const amount = parseFloat(amountInput ? amountInput.value : 0) || 0;
-      const threshold = AppState.thresholds[token] || 2.0;
+      const threshold = AppState.thresholds[token] || (token === 'SOL' ? 2.0 : 100.0);
       const windowMins = getSelectedWindowMinutes();
       const humanWin = formatHumanDuration(windowMins);
 
@@ -1014,34 +1115,72 @@
       if (feeFooterVal) {
         feeFooterVal.textContent = amount > 0 
           ? `+${feeFormatted} ${token}` 
-          : `+0.0000 ${token}`;
+          : `+${(0).toFixed(token === 'SOL' ? 4 : 2)} ${token}`;
       }
       if (gasFooterVal) {
         gasFooterVal.textContent = '0.000005 SOL';
       }
 
-      // Update available hint text
+      // Update available hint text for selected token
       const availHint = document.getElementById('availableAmountHint');
       if (availHint) {
         const avail = AppState.balances[token] ? AppState.balances[token].available : 0;
         availHint.textContent = `Available: ${formatAmount(avail, token === 'SOL' ? 4 : 2)} ${token}`;
       }
 
-      // Update form token logo
-      const formTokenLogo = document.getElementById('formTokenLogo');
-      if (formTokenLogo) {
-        const logoMap = {
-          SOL: { url: '/assets/img/sol.png', local: '/assets/img/sol.png' },
-          USDC: { url: '/assets/img/usdc.png', local: '/assets/img/usdc.png' },
-          USDT: { url: '/assets/img/usdt.png', local: '/assets/img/usdt.png' }
-        };
-        const info = logoMap[token] || logoMap.SOL;
-        formTokenLogo.src = info.url;
-        formTokenLogo.onerror = () => { formTokenLogo.src = info.local; };
+      // Update token logos
+      const tLogo = tokenLogos[token] || tokenLogos.SOL;
+      if (customLogo) {
+        customLogo.src = tLogo.url;
+        customLogo.onerror = () => { customLogo.src = tLogo.local; };
+      }
+      if (customSymbol) {
+        customSymbol.textContent = token;
       }
     }
 
-    if (tokenSelect) tokenSelect.addEventListener('change', updateNotice);
+    // Attach custom dropdown listeners
+    if (customTrigger) {
+      customTrigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (customMenu && !customMenu.classList.contains('hidden')) {
+          closeCustomTokenMenu();
+        } else {
+          openCustomTokenMenu();
+        }
+      });
+    }
+
+    tokenOptions.forEach(opt => {
+      opt.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const tok = opt.dataset.token;
+        setSelectedToken(tok, true);
+      });
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#customTokenSelectWrapper')) {
+        closeCustomTokenMenu();
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeCustomTokenMenu();
+      }
+    });
+
+    // Native select change/input listener for fallback or test runners
+    if (tokenSelect) {
+      tokenSelect.addEventListener('change', () => {
+        setSelectedToken(tokenSelect.value, false);
+      });
+      tokenSelect.addEventListener('input', () => {
+        setSelectedToken(tokenSelect.value, false);
+      });
+    }
+
     if (amountInput) amountInput.addEventListener('input', updateNotice);
     if (presetSelect) {
       presetSelect.addEventListener('change', () => {
@@ -1104,7 +1243,7 @@
     // Form Submit
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const token = tokenSelect.value;
+      const token = tokenSelect ? tokenSelect.value : 'SOL';
       const amount = parseFloat(amountInput.value);
       const destination = destInput.value.trim();
       const note = (document.getElementById('transferNote')?.value || '').trim();
@@ -1220,9 +1359,10 @@
           renderPendingTransfers();
           renderHistoryTable();
 
-          // Reset form inputs & notice
+          // Reset form inputs & retain selected token
+          const prevToken = token;
           form.reset();
-          updateNotice();
+          setSelectedToken(prevToken, false);
 
           // 5. Transition the modal to the Phantom Success Receipt view immediately
           showTransferSuccessReceipt(res, { token, amount, destination, windowMinutes, note });
@@ -1278,7 +1418,9 @@
       }
     });
 
-    updateNotice();
+    // Initialize notice display
+    const initTok = tokenSelect ? tokenSelect.value : 'SOL';
+    setSelectedToken(initTok, false);
   }
 
   // Current Receipt Data Cache for Copy & Navigation Actions
