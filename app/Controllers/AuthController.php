@@ -152,6 +152,7 @@ class AuthController extends Controller
                 'user' => $user->toSafeArray(),
                 'deposit_address' => $user->solana_deposit_address,
                 'balances' => $formattedBalances,
+                'session_token' => session_id(),
             ], 'Login successful.');
         } catch (InvalidArgumentException $e) {
             return $this->jsonError($e->getMessage(), 401);
@@ -456,6 +457,7 @@ class AuthController extends Controller
                 'user' => $user->toSafeArray(),
                 'deposit_address' => $user->solana_deposit_address,
                 'balances' => $formattedBalances,
+                'session_token' => session_id(),
             ], '2FA verification successful.');
         } catch (Throwable $e) {
             return $this->jsonError('Invalid or expired authentication code', 400);

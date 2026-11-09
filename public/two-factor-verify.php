@@ -2,10 +2,8 @@
 
 declare(strict_types=1);
 
-// Ensure session is active
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/../app/bootstrap.php';
+ensure_session_started();
 
 // If already fully authenticated, redirect directly to dashboard
 if (isset($_SESSION['user_id']) && is_numeric($_SESSION['user_id'])) {
@@ -278,6 +276,10 @@ if (empty($_SESSION['pending_2fa_user_id'])) {
         const data = await res.json();
 
         if (data.success) {
+          const token = data.data?.session_token || data.session_token;
+          if (token) {
+            try { localStorage.setItem('solrecall_session_token', token); } catch (e) {}
+          }
           showToast('Verification successful! Redirecting to dashboard...', 'success');
           const destination = data.redirect || (data.data && data.data.redirect) || '/dashboard';
           setTimeout(() => {

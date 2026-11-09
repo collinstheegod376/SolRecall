@@ -1,11 +1,11 @@
 <?php
-// Start session if not started
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+declare(strict_types=1);
+
+require_once __DIR__ . '/../app/bootstrap.php';
+ensure_session_started();
 
 // Redirect if already logged in
-if (isset($_SESSION['user_id'])) {
+if (isset($_SESSION['user_id']) && is_numeric($_SESSION['user_id'])) {
     header('Location: /dashboard');
     exit;
 }
@@ -236,6 +236,10 @@ unset($_SESSION['flash_error'], $_SESSION['flash_success']);
             return;
           }
           if (data.success) {
+            const token = data.data?.session_token || data.session_token;
+            if (token) {
+              try { localStorage.setItem('solrecall_session_token', token); } catch (e) {}
+            }
             window.location.href = '/dashboard';
           } else {
             showToast(data.message || data.error || 'Authentication failed. Please check your credentials.', 'error');

@@ -1,9 +1,10 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+declare(strict_types=1);
 
-if (isset($_SESSION['user_id'])) {
+require_once __DIR__ . '/../app/bootstrap.php';
+ensure_session_started();
+
+if (isset($_SESSION['user_id']) && is_numeric($_SESSION['user_id'])) {
     header('Location: /dashboard');
     exit;
 }

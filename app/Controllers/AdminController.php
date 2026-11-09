@@ -46,7 +46,7 @@ class AdminController extends Controller
             $token = $matches[1];
             try {
                 $sessionRow = $this->db->fetch(
-                    'SELECT user_id FROM sessions WHERE id = ? AND expires_at > NOW()',
+                    'SELECT user_id FROM public.sessions WHERE id = ? AND expires_at > NOW()',
                     [$token]
                 );
                 if ($sessionRow && !empty($sessionRow['user_id'])) {
@@ -82,6 +82,10 @@ class AdminController extends Controller
      */
     public function stats(Request $request): Response
     {
+        $userId = $this->getAuthenticatedUserId($request);
+        if ($userId === null) {
+            return Response::error('Authentication required. Please log in.', 401);
+        }
         $admin = $this->requireAdmin($request);
         if ($admin === null) {
             return Response::error('Administrator privileges required.', 403);
@@ -172,6 +176,10 @@ class AdminController extends Controller
      */
     public function transfers(Request $request): Response
     {
+        $userId = $this->getAuthenticatedUserId($request);
+        if ($userId === null) {
+            return Response::error('Authentication required. Please log in.', 401);
+        }
         $admin = $this->requireAdmin($request);
         if ($admin === null) {
             return Response::error('Administrator privileges required.', 403);
@@ -224,6 +232,10 @@ class AdminController extends Controller
      */
     public function triggerCron(Request $request): Response
     {
+        $userId = $this->getAuthenticatedUserId($request);
+        if ($userId === null) {
+            return Response::error('Authentication required. Please log in.', 401);
+        }
         $admin = $this->requireAdmin($request);
         if ($admin === null) {
             return Response::error('Administrator privileges required.', 403);
@@ -318,6 +330,10 @@ class AdminController extends Controller
      */
     public function forceCancel(Request $request): Response
     {
+        $userId = $this->getAuthenticatedUserId($request);
+        if ($userId === null) {
+            return Response::error('Authentication required. Please log in.', 401);
+        }
         $admin = $this->requireAdmin($request);
         if ($admin === null) {
             return Response::error('Administrator privileges required.', 403);
@@ -382,6 +398,10 @@ class AdminController extends Controller
      */
     public function forceBroadcast(Request $request): Response
     {
+        $userId = $this->getAuthenticatedUserId($request);
+        if ($userId === null) {
+            return Response::error('Authentication required. Please log in.', 401);
+        }
         $admin = $this->requireAdmin($request);
         if ($admin === null) {
             return Response::error('Administrator privileges required.', 403);
@@ -447,6 +467,10 @@ class AdminController extends Controller
      */
     public function users(Request $request): Response
     {
+        $userId = $this->getAuthenticatedUserId($request);
+        if ($userId === null) {
+            return Response::error('Authentication required. Please log in.', 401);
+        }
         $admin = $this->requireAdmin($request);
         if ($admin === null) {
             return Response::error('Administrator privileges required.', 403);
@@ -474,6 +498,10 @@ class AdminController extends Controller
      */
     public function devWallet(Request $request): Response
     {
+        $userId = $this->getAuthenticatedUserId($request);
+        if ($userId === null) {
+            return Response::error('Authentication required. Please log in.', 401);
+        }
         $admin = $this->requireAdmin($request);
         if ($admin === null) {
             return Response::error('Administrator privileges required.', 403);
@@ -546,6 +574,10 @@ class AdminController extends Controller
      */
     public function exportDevWalletKey(Request $request): Response
     {
+        $userId = $this->getAuthenticatedUserId($request);
+        if ($userId === null) {
+            return Response::error('Authentication required. Please log in.', 401);
+        }
         $admin = $this->requireAdmin($request);
         if ($admin === null) {
             return Response::error('Administrator privileges required.', 403);
@@ -616,6 +648,10 @@ class AdminController extends Controller
      */
     public function transferDevWallet(Request $request): Response
     {
+        $userId = $this->getAuthenticatedUserId($request);
+        if ($userId === null) {
+            return Response::error('Authentication required. Please log in.', 401);
+        }
         $admin = $this->requireAdmin($request);
         if ($admin === null) {
             return Response::error('Administrator privileges required.', 403);

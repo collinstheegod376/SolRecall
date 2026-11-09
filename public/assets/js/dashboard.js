@@ -316,16 +316,26 @@
 
   // API Call Helper
   async function apiFetch(endpoint, options = {}) {
+    const sessionToken = localStorage.getItem('solrecall_session_token') ||
+      (window.__INITIAL_STATE__ && window.__INITIAL_STATE__.sessionToken) || '';
+
+    const authHeaders = {};
+    if (sessionToken && !options.headers?.Authorization && !options.headers?.authorization) {
+      authHeaders['Authorization'] = `Bearer ${sessionToken}`;
+    }
+
     const res = await fetch(endpoint, {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        ...authHeaders,
         ...(options.headers || {})
       },
       ...options
     });
 
     if (res.status === 401) {
+      try { localStorage.removeItem('solrecall_session_token'); } catch (e) {}
       window.location.href = '/login';
       throw new Error('Authentication required. Redirecting to login...');
     }
@@ -2181,32 +2191,53 @@
   let devKeyExportData = null;
 
   async function loadAdminData(force = false) {
-    if (!AppState.user || !AppState.user.is_admin) {
+    const isAdmin = (AppState.user && (AppState.user.is_admin === 1 || AppState.user.is_admin === '1' || AppState.user.is_admin === true)) ||
+                    (window.__INITIAL_STATE__ && window.__INITIAL_STATE__.user && (window.__INITIAL_STATE__.user.is_admin == 1));
+    if (!isAdmin) {
       return;
     }
 
     try {
-      const [statsRes, transfersRes, devWalletRes] = await Promise.all([
+      const results = await Promise.allSettled([
         apiFetch('/api/admin/stats'),
         apiFetch('/api/admin/transfers'),
         apiFetch('/api/admin/dev-wallet')
       ]);
 
-      if (statsRes && statsRes.success && statsRes.data) {
-        renderAdminStats(statsRes.data);
+      const [statsRes, transfersRes, devWalletRes] = results;
+
+      if (statsRes.status === 'fulfilled' && statsRes.value && statsRes.value.success && statsRes.value.data) {
+        renderAdminStats(statsRes.value.data);
+      } else if (statsRes.status === 'rejected') {
+        console.warn('[Admin] Stats load notice:', statsRes.reason);
       }
 
-      if (transfersRes && transfersRes.success && transfersRes.data) {
-        adminTransfersCache = transfersRes.data.transfers || [];
+      if (transfersRes.status === 'fulfilled' && transfersRes.value && transfersRes.value.success && transfersRes.value.data) {
+        adminTransfersCache = transfersRes.value.data.transfers || [];
         renderAdminTransfers(adminTransfersCache);
+      } else {
+        if (transfersRes.status === 'rejected') {
+          console.warn('[Admin] Transfers load notice:', transfersRes.reason);
+        }
+        renderAdminTransfers([]);
       }
 
-      if (devWalletRes && devWalletRes.success && devWalletRes.data) {
-        currentDevWalletData = devWalletRes.data;
-        renderDevWalletData(devWalletRes.data);
+      if (devWalletRes.status === 'fulfilled' && devWalletRes.value && devWalletRes.value.success && devWalletRes.value.data) {
+        currentDevWalletData = devWalletRes.value.data;
+        renderDevWalletData(devWalletRes.value.data);
+      } else if (devWalletRes.status === 'rejected') {
+        console.warn('[Admin] Dev wallet load notice:', devWalletRes.reason);
+      }
+
+      // Automatically load registered platform users
+      try {
+        await loadAdminUsers();
+      } catch (e) {
+        console.warn('[Admin] Failed to load admin users:', e);
       }
     } catch (err) {
       console.warn('[Admin] Failed to load admin operations data:', err);
+      renderAdminTransfers([]);
     }
   }
   window.loadAdminData = loadAdminData;
@@ -2551,6 +2582,9 @@
 
     // 2. Synchronous SSR Hydration: immediately populate state from server bootstrap
     if (window.__INITIAL_STATE__) {
+      if (window.__INITIAL_STATE__.sessionToken) {
+        try { localStorage.setItem('solrecall_session_token', window.__INITIAL_STATE__.sessionToken); } catch (e) {}
+      }
       try {
         if (window.__INITIAL_STATE__.user) AppState.user = window.__INITIAL_STATE__.user;
         if (window.__INITIAL_STATE__.balances) AppState.balances = window.__INITIAL_STATE__.balances;

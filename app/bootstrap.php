@@ -185,24 +185,188 @@ if (!function_exists('public_path')) {
     }
 }
 
+if (!function_exists('hydrate_session_from_db_if_needed')) {
+    function hydrate_session_from_db_if_needed(): void {
+        // If user_id is already set, ensure is_admin and profile fields are loaded
+        if (!empty($_SESSION['user_id']) && is_numeric($_SESSION['user_id'])) {
+            $uid = (int) $_SESSION['user_id'];
+            if (!isset($_SESSION['is_admin']) || empty($_SESSION['username'])) {
+                try {
+                    $db = \App\Core\Database::getInstance();
+                    $u = $db->fetch('SELECT id, username, email, is_admin, solana_deposit_address, two_factor_enabled FROM users WHERE id = ?', [$uid]);
+                    if ($u) {
+                        $_SESSION['username'] = (string) $u['username'];
+                        $_SESSION['email'] = (string) $u['email'];
+                        $_SESSION['is_admin'] = (int) ($u['is_admin'] ?? 0);
+                        $_SESSION['solana_deposit_address'] = (string) ($u['solana_deposit_address'] ?? '');
+                        $_SESSION['two_factor_enabled'] = (int) ($u['two_factor_enabled'] ?? 0);
+                    }
+                } catch (\Throwable) {}
+            }
+            return;
+        }
+
+        // Collect all candidate session identifiers: active ID, cookies, Bearer header
+        $candidates = [];
+        $sid = session_id();
+        if (!empty($sid)) {
+            $candidates[] = $sid;
+        }
+        $cookieName = (string) config('session.cookie_name', 'undo_session');
+        if (!empty($_COOKIE[$cookieName])) {
+            $candidates[] = $_COOKIE[$cookieName];
+        }
+        if (!empty($_COOKIE['PHPSESSID'])) {
+            $candidates[] = $_COOKIE['PHPSESSID'];
+        }
+        $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+        if (empty($authHeader) && function_exists('apache_request_headers')) {
+            $headers = apache_request_headers();
+            $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+        }
+        if (!empty($authHeader) && preg_match('/Bearer\s+([a-zA-Z0-9,\-_]{16,128})/i', $authHeader, $matches)) {
+            $candidates[] = $matches[1];
+        }
+
+        $candidates = array_unique(array_filter($candidates));
+        if (empty($candidates)) {
+            return;
+        }
+
+        // Look up active session in PostgreSQL
+        try {
+            $db = \App\Core\Database::getInstance();
+            $placeholders = implode(',', array_fill(0, count($candidates), '?'));
+            $sess = $db->fetch(
+                "SELECT id, user_id, payload, expires_at FROM public.sessions WHERE id IN ({$placeholders}) AND expires_at > NOW() ORDER BY last_activity DESC LIMIT 1",
+                array_values($candidates)
+            );
+
+            if ($sess) {
+                // Restore session payload if present
+                if (!empty($sess['payload'])) {
+                    $decoded = json_decode((string) $sess['payload'], true);
+                    if (is_array($decoded)) {
+                        foreach ($decoded as $k => $v) {
+                            if (!isset($_SESSION[$k])) {
+                                $_SESSION[$k] = $v;
+                            }
+                        }
+                    }
+                }
+
+                if (!empty($sess['user_id'])) {
+                    $uid = (int) $sess['user_id'];
+                    $u = $db->fetch('SELECT id, username, email, is_admin, solana_deposit_address, two_factor_enabled FROM users WHERE id = ?', [$uid]);
+                    if ($u) {
+                        $_SESSION['user_id'] = $uid;
+                        $_SESSION['username'] = (string) $u['username'];
+                        $_SESSION['email'] = (string) $u['email'];
+                        $_SESSION['is_admin'] = (int) ($u['is_admin'] ?? 0);
+                        $_SESSION['solana_deposit_address'] = (string) ($u['solana_deposit_address'] ?? '');
+                        $_SESSION['two_factor_enabled'] = (int) ($u['two_factor_enabled'] ?? 0);
+
+                        $db->execute("UPDATE public.sessions SET last_activity = EXTRACT(EPOCH FROM NOW())::integer WHERE id = ?", [$sess['id']]);
+                    }
+                }
+            }
+        } catch (\Throwable) {
+            // Database recovery non-fatal
+        }
+    }
+}
+
+if (!function_exists('sync_session_to_db')) {
+    function sync_session_to_db(): void {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            return;
+        }
+
+        $sid = session_id();
+        if (empty($sid)) {
+            return;
+        }
+
+        $userId = $_SESSION['user_id'] ?? $_SESSION['pending_2fa_user_id'] ?? null;
+        if (!$userId || !is_numeric($userId)) {
+            return;
+        }
+
+        try {
+            $db = \App\Core\Database::getInstance();
+            $lifetime = (int) config('session.lifetime', 86400 * 30);
+            $expiresAt = date('Y-m-d H:i:s', time() + $lifetime);
+            $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+            $ua = $_SERVER['HTTP_USER_AGENT'] ?? null;
+            $payload = json_encode($_SESSION);
+
+            $db->execute("
+                INSERT INTO public.sessions (id, user_id, ip_address, user_agent, payload, expires_at, last_activity)
+                VALUES (?, ?, ?, ?, ?, ?, EXTRACT(EPOCH FROM NOW())::integer)
+                ON CONFLICT (id) DO UPDATE SET 
+                    user_id = EXCLUDED.user_id,
+                    ip_address = COALESCE(EXCLUDED.ip_address, public.sessions.ip_address),
+                    user_agent = COALESCE(EXCLUDED.user_agent, public.sessions.user_agent),
+                    payload = EXCLUDED.payload,
+                    expires_at = EXCLUDED.expires_at,
+                    last_activity = EXCLUDED.last_activity
+            ", [$sid, (int) $userId, $ip, $ua, $payload, $expiresAt]);
+        } catch (\Throwable) {
+            // DB session sync non-fatal
+        }
+    }
+}
+
 if (!function_exists('ensure_session_started')) {
     function ensure_session_started(): void {
-        if (session_status() === PHP_SESSION_NONE) {
-            if (!headers_sent()) {
-                $lifetime = (int) config('session.lifetime', 86400);
-                $cookieName = (string) config('session.cookie_name', 'undo_session');
+        static $registeredShutdown = false;
 
-                session_name($cookieName);
-                session_set_cookie_params([
-                    'lifetime' => $lifetime,
-                    'path' => '/',
-                    'domain' => '',
-                    'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
-                    'httponly' => true,
-                    'samesite' => 'Lax',
-                ]);
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            hydrate_session_from_db_if_needed();
+            return;
+        }
+
+        $lifetime = (int) config('session.lifetime', 86400 * 30);
+        $cookieName = (string) config('session.cookie_name', 'undo_session');
+
+        if (!headers_sent()) {
+            // Adopt existing session cookie or Bearer token if present
+            if (isset($_COOKIE[$cookieName]) && preg_match('/^[a-zA-Z0-9,\-_]{16,128}$/', $_COOKIE[$cookieName])) {
+                @session_id($_COOKIE[$cookieName]);
+            } elseif (isset($_COOKIE['PHPSESSID']) && preg_match('/^[a-zA-Z0-9,\-_]{16,128}$/', $_COOKIE['PHPSESSID'])) {
+                @session_id($_COOKIE['PHPSESSID']);
+            } else {
+                $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+                if (empty($authHeader) && function_exists('apache_request_headers')) {
+                    $headers = apache_request_headers();
+                    $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+                }
+                if (!empty($authHeader) && preg_match('/Bearer\s+([a-zA-Z0-9,\-_]{16,128})/i', $authHeader, $matches)) {
+                    @session_id($matches[1]);
+                }
             }
-            @session_start();
+            session_name($cookieName);
+            $isHttps = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ||
+                       (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https') ||
+                       (!empty($_SERVER['VERCEL']) || !empty($_SERVER['NOW_REGION']));
+
+            session_set_cookie_params([
+                'lifetime' => $lifetime,
+                'path' => '/',
+                'domain' => '',
+                'secure' => $isHttps,
+                'httponly' => true,
+                'samesite' => 'Lax',
+            ]);
+        }
+
+        @session_start();
+
+        hydrate_session_from_db_if_needed();
+
+        if (!$registeredShutdown) {
+            $registeredShutdown = true;
+            register_shutdown_function('sync_session_to_db');
         }
     }
 }

@@ -23,10 +23,8 @@ if (file_exists($bootstrapFile)) {
     require_once $bootstrapFile;
 }
 
-// 3. Ensure session is started
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+// 3. Ensure session is started and hydrated from PostgreSQL
+ensure_session_started();
 
 use App\Core\Request;
 use App\Core\Response;
@@ -118,13 +116,19 @@ if ($path === '/register' || $path === '/register.php') {
 }
 
 if ($path === '/logout') {
+    $sid = session_id();
+    if (!empty($sid)) {
+        try {
+            \App\Core\Database::getInstance()->execute("DELETE FROM public.sessions WHERE id = ?", [$sid]);
+        } catch (\Throwable) {}
+    }
     $_SESSION = [];
     if (ini_get('session.use_cookies')) {
         $params = session_get_cookie_params();
         setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
     }
     if (session_status() === PHP_SESSION_ACTIVE) {
-        session_destroy();
+        @session_destroy();
     }
     header('Location: /login');
     exit;
@@ -166,9 +170,19 @@ if (str_starts_with($path, '/api/')) {
             }
 
             if ($sub === 'logout') {
+                $sid = session_id();
+                if (!empty($sid)) {
+                    try {
+                        \App\Core\Database::getInstance()->execute("DELETE FROM public.sessions WHERE id = ?", [$sid]);
+                    } catch (\Throwable) {}
+                }
                 $_SESSION = [];
+                if (ini_get('session.use_cookies')) {
+                    $params = session_get_cookie_params();
+                    setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+                }
                 if (session_status() === PHP_SESSION_ACTIVE) {
-                    session_destroy();
+                    @session_destroy();
                 }
                 header('Location: /login');
                 exit;

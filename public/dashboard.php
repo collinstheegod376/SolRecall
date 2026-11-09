@@ -1,7 +1,8 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+declare(strict_types=1);
+
+require_once __DIR__ . '/../app/bootstrap.php';
+ensure_session_started();
 
 // Anti-cache headers to prevent browser from serving stale session or shell assets
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -17,8 +18,7 @@ if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
 $userId = (int) $_SESSION['user_id'];
 
 // Guarantee user details and custodial deposit address are loaded from DB
-require_once __DIR__ . '/../app/bootstrap.php';
-if (empty($_SESSION['solana_deposit_address']) || empty($_SESSION['username'])) {
+if (empty($_SESSION['solana_deposit_address']) || empty($_SESSION['username']) || !isset($_SESSION['is_admin'])) {
     try {
         $userModel = \App\Models\User::find($userId);
         if ($userModel) {
@@ -1821,6 +1821,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
   <script src="/assets/js/wallet.js?v=<?= file_exists(__DIR__ . '/assets/js/wallet.js') ? filemtime(__DIR__ . '/assets/js/wallet.js') : '1.1' ?>"></script>
   <script>
     window.__INITIAL_STATE__ = <?= json_encode([
+      'sessionToken' => session_id(),
       'user' => [
         'id' => $userId,
         'username' => $_SESSION['username'] ?? 'User',
