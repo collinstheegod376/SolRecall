@@ -24,7 +24,7 @@ unset($_SESSION['flash_error'], $_SESSION['flash_success']);
 <html lang="en" class="dark overflow-x-hidden">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>SolRecall - Reversible Time-Locked Escrow on Solana</title>
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32.png">

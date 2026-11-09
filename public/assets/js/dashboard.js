@@ -922,12 +922,8 @@
     if (!form) return;
 
     const tokenSelect = document.getElementById('transferToken');
-    const customTrigger = document.getElementById('customTokenTrigger');
-    const customMenu = document.getElementById('customTokenMenu');
-    const customChevron = document.getElementById('customTokenChevron');
     const customLogo = document.getElementById('customTokenSelectedLogo');
     const customSymbol = document.getElementById('customTokenSelectedSymbol');
-    const tokenOptions = document.querySelectorAll('.token-option');
 
     const amountInput = document.getElementById('transferAmount');
     const destInput = document.getElementById('transferDestination');
@@ -958,21 +954,7 @@
       return parseInt(presetSelect.value, 10) || (AppState.settings.undoWindowMinutes || 10);
     }
 
-    function openCustomTokenMenu() {
-      if (!customMenu) return;
-      customMenu.classList.remove('hidden');
-      if (customTrigger) customTrigger.setAttribute('aria-expanded', 'true');
-      if (customChevron) customChevron.classList.add('rotate-180');
-    }
-
-    function closeCustomTokenMenu() {
-      if (!customMenu) return;
-      customMenu.classList.add('hidden');
-      if (customTrigger) customTrigger.setAttribute('aria-expanded', 'false');
-      if (customChevron) customChevron.classList.remove('rotate-180');
-    }
-
-    function setSelectedToken(tok, triggerEvents = true) {
+    function selectTransferToken(tok, triggerEvents = true) {
       if (!tok) tok = 'SOL';
       tok = tok.toUpperCase();
       if (!['SOL', 'USDC', 'USDT'].includes(tok)) tok = 'SOL';
@@ -982,7 +964,7 @@
         tokenSelect.value = tok;
       }
 
-      // 2. Sync trigger button UI
+      // 2. Sync trigger display logo & symbol
       const tLogo = tokenLogos[tok] || tokenLogos.SOL;
       if (customLogo) {
         customLogo.src = tLogo.url;
@@ -1000,39 +982,44 @@
         customSymbol.textContent = tok;
       }
 
-      // 3. Update input step & placeholder
+      // 3. Highlight quick switcher pills (SOL, USDC, USDT)
+      ['SOL', 'USDC', 'USDT'].forEach(sym => {
+        const pill = document.getElementById(`pillBtn-${sym}`);
+        if (pill) {
+          if (sym === tok) {
+            if (tok === 'SOL') pill.className = 'flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-bold font-crypto transition cursor-pointer bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm';
+            else if (tok === 'USDC') pill.className = 'flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-bold font-crypto transition cursor-pointer bg-blue-500/20 text-blue-300 border border-blue-500/40 shadow-sm';
+            else pill.className = 'flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-bold font-crypto transition cursor-pointer bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm';
+          } else {
+            pill.className = 'flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-bold font-crypto transition cursor-pointer bg-slate-800 text-slate-400 hover:text-white border border-white/5';
+          }
+        }
+      });
+
+      // 4. Update input step & placeholder
       if (amountInput) {
         amountInput.step = tok === 'SOL' ? 'any' : '0.01';
         amountInput.placeholder = tok === 'SOL' ? '0.0000' : '0.00';
       }
 
-      // 4. Update active highlight in menu options
-      tokenOptions.forEach(opt => {
-        const optTok = opt.dataset.token;
-        const isSelected = (optTok === tok);
-        opt.setAttribute('aria-selected', isSelected ? 'true' : 'false');
-        if (isSelected) {
-          if (tok === 'SOL') opt.className = 'token-option w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-white/10 border border-purple-500/40 transition text-left group cursor-pointer bg-purple-500/10 shadow-sm';
-          else if (tok === 'USDC') opt.className = 'token-option w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-white/10 border border-blue-500/40 transition text-left group cursor-pointer bg-blue-500/10 shadow-sm';
-          else opt.className = 'token-option w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-white/10 border border-emerald-500/40 transition text-left group cursor-pointer bg-emerald-500/10 shadow-sm';
-        } else {
-          opt.className = 'token-option w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-white/10 border border-transparent transition text-left group cursor-pointer';
-        }
-      });
+      // 5. Update available hint text for selected token
+      const availHint = document.getElementById('availableAmountHint');
+      if (availHint) {
+        const avail = AppState.balances[tok] ? AppState.balances[tok].available : 0;
+        availHint.textContent = `Available: ${formatAmount(avail, tok === 'SOL' ? 4 : 2)} ${tok}`;
+      }
 
-      // 5. Close dropdown
-      closeCustomTokenMenu();
-
-      // 6. Recalculate fees, available balance hint, and preview notices
+      // 6. Recalculate fees & notices
       updateNotice();
 
-      // 7. Fire standard events for complete backward compatibility
+      // 7. Dispatch events
       if (triggerEvents && tokenSelect) {
         tokenSelect.dispatchEvent(new Event('change', { bubbles: true }));
         tokenSelect.dispatchEvent(new Event('input', { bubbles: true }));
       }
     }
-    window.setSelectedToken = setSelectedToken;
+    window.selectTransferToken = selectTransferToken;
+    window.setSelectedToken = selectTransferToken;
 
     function updateNotice() {
       const token = tokenSelect ? tokenSelect.value : 'SOL';
@@ -1139,45 +1126,13 @@
       }
     }
 
-    // Attach custom dropdown listeners
-    if (customTrigger) {
-      customTrigger.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (customMenu && !customMenu.classList.contains('hidden')) {
-          closeCustomTokenMenu();
-        } else {
-          openCustomTokenMenu();
-        }
-      });
-    }
-
-    tokenOptions.forEach(opt => {
-      opt.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const tok = opt.dataset.token;
-        setSelectedToken(tok, true);
-      });
-    });
-
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('#customTokenSelectWrapper')) {
-        closeCustomTokenMenu();
-      }
-    });
-
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        closeCustomTokenMenu();
-      }
-    });
-
-    // Native select change/input listener for fallback or test runners
+    // Native select change/input listener
     if (tokenSelect) {
       tokenSelect.addEventListener('change', () => {
-        setSelectedToken(tokenSelect.value, false);
+        selectTransferToken(tokenSelect.value, false);
       });
       tokenSelect.addEventListener('input', () => {
-        setSelectedToken(tokenSelect.value, false);
+        selectTransferToken(tokenSelect.value, false);
       });
     }
 
@@ -1362,12 +1317,12 @@
           // Reset form inputs & retain selected token
           const prevToken = token;
           form.reset();
-          setSelectedToken(prevToken, false);
+          selectTransferToken(prevToken, false);
 
           // 5. Transition the modal to the Phantom Success Receipt view immediately
           showTransferSuccessReceipt(res, { token, amount, destination, windowMinutes, note });
 
-          // 6. Asynchronous non-blocking background sync (does NOT delay or block UI)
+          // 6. Asynchronous non-blocking background sync
           (async () => {
             try {
               const [bRes, pRes, hRes] = await Promise.all([
@@ -1420,7 +1375,7 @@
 
     // Initialize notice display
     const initTok = tokenSelect ? tokenSelect.value : 'SOL';
-    setSelectedToken(initTok, false);
+    selectTransferToken(initTok, false);
   }
 
   // Current Receipt Data Cache for Copy & Navigation Actions

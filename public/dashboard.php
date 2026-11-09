@@ -111,7 +111,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
 <html lang="en" class="dark overflow-x-hidden">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>SolRecall - Reversible Time-Locked Escrow on Solana</title>
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32.png">
@@ -478,119 +478,69 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
               <!-- Form -->
               <form id="newTransferForm" class="space-y-4">
 
-                <!-- Token Selector & Amount Grid with Custom Web3 Token Dropdown -->
-                <div class="grid grid-cols-3 gap-3">
-                  <div class="col-span-1">
-                    <label for="transferToken" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
-                      Token
+                <!-- Asset Switcher Tabs (SOL, USDC, USDT) -->
+                <div>
+                  <div class="flex items-center justify-between mb-1.5">
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                      Select Asset
                     </label>
-                    <div class="relative" id="customTokenSelectWrapper">
-                      <!-- Hidden native select for form serialization & automated test compatibility -->
-                      <select id="transferToken" name="token" class="sr-only" tabindex="-1" aria-hidden="true">
-                        <option value="SOL" selected>SOL</option>
-                        <option value="USDC">USDC</option>
-                        <option value="USDT">USDT</option>
-                      </select>
-
-                      <!-- Interactive Custom Trigger Button with Official Logo & Symbol -->
-                      <button type="button"
-                              id="customTokenTrigger"
-                              class="w-full flex items-center justify-between px-2.5 sm:px-3 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-white/10 hover:border-purple-500/50 text-white font-semibold text-sm transition shadow-sm focus:outline-none focus:border-purple-500 cursor-pointer"
-                              aria-haspopup="listbox"
-                              aria-expanded="false">
-                        <div class="flex items-center gap-2 min-w-0">
-                          <img id="customTokenSelectedLogo"
-                               src="/assets/img/sol.svg"
-                               onerror="this.src='/assets/img/sol.png'"
-                               alt="SOL"
-                               class="w-5 h-5 rounded-full object-contain shrink-0 p-0.5 bg-black/40 border border-purple-500/30">
-                          <span id="customTokenSelectedSymbol" class="font-crypto tracking-wide font-bold text-white text-xs sm:text-sm">SOL</span>
-                        </div>
-                        <svg id="customTokenChevron" class="w-3.5 h-3.5 text-slate-400 transition-transform duration-200 shrink-0 ml-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="m19 9-7 7-7-7"/>
-                        </svg>
-                      </button>
-
-                      <!-- Custom Dropdown Menu (Floating Panel with High Z-Index & Glass Blur) -->
-                      <div id="customTokenMenu"
-                           class="hidden absolute top-full left-0 mt-1.5 w-60 sm:w-64 rounded-2xl bg-[#0e0e14]/95 backdrop-blur-xl border border-purple-500/30 shadow-2xl p-1.5 z-50 space-y-1"
-                           role="listbox">
-                        <!-- Option SOL -->
-                        <button type="button"
-                                data-token="SOL"
-                                class="token-option w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-white/10 border border-purple-500/30 transition text-left group cursor-pointer bg-purple-500/10"
-                                role="option"
-                                aria-selected="true">
-                          <div class="flex items-center gap-2.5 min-w-0">
-                            <img src="/assets/img/sol.svg" onerror="this.src='/assets/img/sol.png'" alt="SOL" class="w-6 h-6 rounded-full object-contain shrink-0 p-0.5 bg-black/50 border border-purple-500/30">
-                            <div>
-                              <div class="text-xs font-bold text-white font-crypto group-hover:text-purple-300">SOL</div>
-                              <div class="text-[10px] text-slate-400">Solana</div>
-                            </div>
-                          </div>
-                          <div class="text-right pl-2">
-                            <div id="tokenMenuBal-SOL" class="text-xs font-mono font-bold text-purple-300"><?= number_format($ssrSolAvail, 4, '.', '') ?></div>
-                            <div class="text-[10px] text-slate-400">Available</div>
-                          </div>
-                        </button>
-
-                        <!-- Option USDC -->
-                        <button type="button"
-                                data-token="USDC"
-                                class="token-option w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-white/10 border border-transparent hover:border-blue-500/30 transition text-left group cursor-pointer"
-                                role="option"
-                                aria-selected="false">
-                          <div class="flex items-center gap-2.5 min-w-0">
-                            <img src="/assets/img/usdc.svg" onerror="this.src='/assets/img/usdc.png'" alt="USDC" class="w-6 h-6 rounded-full object-contain shrink-0 p-0.5 bg-black/50 border border-blue-500/30">
-                            <div>
-                              <div class="text-xs font-bold text-white font-crypto group-hover:text-blue-300">USDC</div>
-                              <div class="text-[10px] text-slate-400">USD Coin</div>
-                            </div>
-                          </div>
-                          <div class="text-right pl-2">
-                            <div id="tokenMenuBal-USDC" class="text-xs font-mono font-bold text-blue-300"><?= number_format($ssrUsdcAvail, 2, '.', '') ?></div>
-                            <div class="text-[10px] text-slate-400">Available</div>
-                          </div>
-                        </button>
-
-                        <!-- Option USDT -->
-                        <button type="button"
-                                data-token="USDT"
-                                class="token-option w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-white/10 border border-transparent hover:border-emerald-500/30 transition text-left group cursor-pointer"
-                                role="option"
-                                aria-selected="false">
-                          <div class="flex items-center gap-2.5 min-w-0">
-                            <img src="/assets/img/usdt.svg" onerror="this.src='/assets/img/usdt.png'" alt="USDT" class="w-6 h-6 rounded-full object-contain shrink-0 p-0.5 bg-black/50 border border-emerald-500/30">
-                            <div>
-                              <div class="text-xs font-bold text-white font-crypto group-hover:text-emerald-300">USDT</div>
-                              <div class="text-[10px] text-slate-400">Tether USD</div>
-                            </div>
-                          </div>
-                          <div class="text-right pl-2">
-                            <div id="tokenMenuBal-USDT" class="text-xs font-mono font-bold text-emerald-300"><?= number_format($ssrUsdtAvail, 2, '.', '') ?></div>
-                            <div class="text-[10px] text-slate-400">Available</div>
-                          </div>
-                        </button>
-                      </div>
-                    </div>
+                    <span class="text-[11px] text-purple-400 font-medium">1-Tap Switch</span>
                   </div>
+                  <div class="grid grid-cols-3 gap-2" id="quickTokenTabs">
+                    <button type="button" onclick="selectTransferToken('SOL')" id="pillBtn-SOL"
+                            class="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-bold font-crypto transition cursor-pointer bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm">
+                      <img src="/assets/img/sol.svg" onerror="this.src='/assets/img/sol.png'" alt="SOL" class="w-4 h-4 rounded-full object-contain shrink-0 p-0.5 bg-black/40 border border-purple-500/30">
+                      <span>SOL</span>
+                    </button>
+                    <button type="button" onclick="selectTransferToken('USDC')" id="pillBtn-USDC"
+                            class="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-bold font-crypto transition cursor-pointer bg-slate-800 text-slate-400 hover:text-white border border-white/5">
+                      <img src="/assets/img/usdc.svg" onerror="this.src='/assets/img/usdc.png'" alt="USDC" class="w-4 h-4 rounded-full object-contain shrink-0 p-0.5 bg-black/40 border border-blue-500/30">
+                      <span>USDC</span>
+                    </button>
+                    <button type="button" onclick="selectTransferToken('USDT')" id="pillBtn-USDT"
+                            class="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-bold font-crypto transition cursor-pointer bg-slate-800 text-slate-400 hover:text-white border border-white/5">
+                      <img src="/assets/img/usdt.svg" onerror="this.src='/assets/img/usdt.png'" alt="USDT" class="w-4 h-4 rounded-full object-contain shrink-0 p-0.5 bg-black/40 border border-emerald-500/30">
+                      <span>USDT</span>
+                    </button>
+                  </div>
+                  <!-- Backing Select for Native Form Handling -->
+                  <select id="transferToken"
+                          name="token"
+                          class="sr-only"
+                          aria-label="Select Token">
+                    <option value="SOL" selected>SOL - Solana (<?= number_format($ssrSolAvail, 4, '.', '') ?> SOL)</option>
+                    <option value="USDC">USDC - USD Coin (<?= number_format($ssrUsdcAvail, 2, '.', '') ?> USDC)</option>
+                    <option value="USDT">USDT - Tether USD (<?= number_format($ssrUsdtAvail, 2, '.', '') ?> USDT)</option>
+                  </select>
+                </div>
 
-                  <div class="col-span-2">
-                    <div class="flex items-center justify-between mb-1.5">
-                      <label for="transferAmount" class="block text-xs font-semibold uppercase tracking-wider text-slate-400">
-                        Amount
-                      </label>
-                      <button type="button" id="maxAmountBtn" class="text-[11px] font-bold text-purple-400 hover:text-purple-300 cursor-pointer">
-                        MAX
-                      </button>
-                    </div>
+                <!-- Transfer Amount with Inline Token Badge -->
+                <div>
+                  <div class="flex items-center justify-between mb-1.5">
+                    <label for="transferAmount" class="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                      Amount
+                    </label>
+                    <button type="button" id="maxAmountBtn" class="text-[11px] font-bold text-purple-400 hover:text-purple-300 cursor-pointer">
+                      MAX
+                    </button>
+                  </div>
+                  <div class="relative">
                     <input type="number"
                            id="transferAmount"
                            step="any"
                            min="0.0001"
                            required
                            placeholder="0.00"
-                           class="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-white font-mono text-sm focus:outline-none focus:border-purple-500 transition">
+                           class="w-full pl-3.5 pr-20 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-white font-mono text-base sm:text-sm focus:outline-none focus:border-purple-500 transition"
+                           style="font-size: 16px;">
+                    <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none select-none">
+                      <img id="customTokenSelectedLogo"
+                           src="/assets/img/sol.svg"
+                           onerror="this.src='/assets/img/sol.png'"
+                           alt="SOL"
+                           class="w-4 h-4 rounded-full object-contain shrink-0 p-0.5 bg-black/40 border border-purple-500/30">
+                      <span id="customTokenSelectedSymbol" class="font-crypto tracking-wide font-bold text-slate-300 text-xs">SOL</span>
+                    </div>
                   </div>
                 </div>
 
@@ -598,9 +548,9 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
                 <div class="flex items-center justify-between text-xs">
                   <span id="availableAmountHint" class="text-slate-400 font-mono">Available: <?= number_format($ssrSolAvail, 4, '.', '') ?> SOL</span>
                   <div class="flex items-center gap-1.5">
-                    <button type="button" data-percent="25" class="percent-btn px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-300 transition">25%</button>
-                    <button type="button" data-percent="50" class="percent-btn px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-300 transition">50%</button>
-                    <button type="button" data-percent="100" class="percent-btn px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-300 transition">100%</button>
+                    <button type="button" data-percent="25" class="percent-btn px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-300 transition cursor-pointer">25%</button>
+                    <button type="button" data-percent="50" class="percent-btn px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-300 transition cursor-pointer">50%</button>
+                    <button type="button" data-percent="100" class="percent-btn px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-300 transition cursor-pointer">100%</button>
                   </div>
                 </div>
 
@@ -614,7 +564,8 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
                          required
                          autocomplete="off"
                          placeholder="Recipient Solana wallet address..."
-                         class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-white font-mono text-xs focus:outline-none focus:border-purple-500 transition">
+                         class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-white font-mono text-base sm:text-xs focus:outline-none focus:border-purple-500 transition"
+                         style="font-size: 16px;">
                 </div>
 
                 <!-- Memo / Note -->
@@ -626,7 +577,8 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
                          id="transferNote"
                          maxlength="80"
                          placeholder="e.g. Design invoice #1029"
-                         class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs focus:outline-none focus:border-purple-500 transition">
+                         class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-base sm:text-xs focus:outline-none focus:border-purple-500 transition"
+                         style="font-size: 16px;">
                 </div>
 
                 <!-- Escrow Hold / Timelock Duration Selection (Minutes to Years) -->
@@ -637,7 +589,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
                     </label>
                     <span class="text-[11px] text-purple-400 font-medium">Minutes to Years</span>
                   </div>
-                  <select id="transferWindowPreset" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-white text-xs focus:outline-none focus:border-purple-500 transition">
+                  <select id="transferWindowPreset" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-white text-base sm:text-xs focus:outline-none focus:border-purple-500 transition" style="font-size: 16px;">
                     <option value="5">5 Minutes</option>
                     <option value="10" selected>10 Minutes (Default)</option>
                     <option value="60">1 Hour</option>

@@ -574,3 +574,15 @@ code,
   transform-origin: center;
   animation: ring-rotate 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
+
+/* Prevent iOS Safari auto-zoom on input focus (requires >= 16px font-size) */
+@media screen and (max-width: 768px) {
+  input,
+  select,
+  textarea,
+  input[type="number"],
+  input[type="text"],
+  input[type="password"] {
+    font-size: 16px !important;
+  }
+}
