@@ -294,7 +294,9 @@ class AuthService
         // Check if a user account already exists with this wallet address
         $user = User::findByWallet($cleanPubKey);
         if ($user !== null) {
-            $this->login($user);
+            if (empty($user->two_factor_enabled)) {
+                $this->login($user);
+            }
             return $user;
         }
 

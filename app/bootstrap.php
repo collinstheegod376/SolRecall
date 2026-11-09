@@ -255,7 +255,8 @@ if (!function_exists('hydrate_session_from_db_if_needed')) {
                     }
                 }
 
-                if (!empty($sess['user_id'])) {
+                // Only restore full authenticated user if session has NO pending unverified 2FA challenge
+                if (!empty($sess['user_id']) && empty($_SESSION['pending_2fa_user_id'])) {
                     $uid = (int) $sess['user_id'];
                     $u = $db->fetch('SELECT id, username, email, is_admin, solana_deposit_address, two_factor_enabled FROM users WHERE id = ?', [$uid]);
                     if ($u) {
@@ -287,10 +288,16 @@ if (!function_exists('sync_session_to_db')) {
             return;
         }
 
-        $userId = $_SESSION['user_id'] ?? $_SESSION['pending_2fa_user_id'] ?? null;
-        if (!$userId || !is_numeric($userId)) {
+        $isFullyAuthed = !empty($_SESSION['user_id']) && is_numeric($_SESSION['user_id']);
+        $hasPending2fa = !empty($_SESSION['pending_2fa_user_id']) && is_numeric($_SESSION['pending_2fa_user_id']);
+
+        if (!$isFullyAuthed && !$hasPending2fa) {
             return;
         }
+
+        // Only store user_id foreign key if FULLY authenticated!
+        // For unverified 2FA challenges, user_id in DB is NULL so hydration never promotes unverified sessions!
+        $dbUserId = (int) ($_SESSION['user_id'] ?? $_SESSION['pending_2fa_user_id']);
 
         try {
             $db = \App\Core\Database::getInstance();
@@ -310,7 +317,7 @@ if (!function_exists('sync_session_to_db')) {
                     payload = EXCLUDED.payload,
                     expires_at = EXCLUDED.expires_at,
                     last_activity = EXCLUDED.last_activity
-            ", [$sid, (int) $userId, $ip, $ua, $payload, $expiresAt]);
+            ", [$sid, $dbUserId, $ip, $ua, $payload, $expiresAt]);
         } catch (\Throwable) {
             // DB session sync non-fatal
         }

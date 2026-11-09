@@ -264,6 +264,17 @@ class AuthController extends Controller
 
             $user = $this->authService->verifySolanaSignature($publicKey, $signature, $message);
 
+            if (!empty($user->two_factor_enabled)) {
+                ensure_session_started();
+                $_SESSION['pending_2fa_user_id'] = (int) $user->id;
+                unset($_SESSION['user_id']);
+
+                return Response::success([
+                    'requires_2fa' => true,
+                    'redirect' => '/two-factor-verify',
+                ], 'Two-factor authentication code required.');
+            }
+
             $balances = $user->getBalances();
             $formattedBalances = [];
             foreach ($balances as $token => $b) {

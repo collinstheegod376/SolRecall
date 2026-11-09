@@ -207,6 +207,12 @@
 
           const verifyData = await verifyRes.json();
           if (verifyData.success) {
+            const requires2fa = Boolean(verifyData.requires_2fa || (verifyData.data && verifyData.data.requires_2fa));
+            if (requires2fa) {
+              const dest = verifyData.redirect || (verifyData.data && verifyData.data.redirect) || '/two-factor-verify';
+              window.location.href = dest;
+              return true;
+            }
             if (window.showToast) window.showToast('Wallet successfully verified! Redirecting...', 'success');
             setTimeout(() => {
               window.location.href = '/dashboard';
