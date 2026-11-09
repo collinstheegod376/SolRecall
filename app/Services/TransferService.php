@@ -638,6 +638,99 @@ class TransferService
         }
     }
 
+
+    /**
+     * Process any pending escrow transfers whose undo grace period has expired.
+     * Settles on Solana on-chain and credits 12% platform fee to Dev Wallet.
+     */
+    public function processExpiredTransfers(): int
+    {
+        $now = date('Y-m-d H:i:s');
+        $sql = "SELECT pt.*, u.encrypted_private_key, u.solana_deposit_address 
+                FROM pending_transfers pt 
+                JOIN users u ON pt.user_id = u.id 
+                WHERE pt.status = 'pending' AND pt.expires_at <= ? 
+                ORDER BY pt.expires_at ASC 
+                LIMIT 25";
+
+        $expiredList = $this->db->fetchAll($sql, [$now]);
+        if (empty($expiredList)) {
+            return 0;
+        }
+
+        $processed = 0;
+        foreach ($expiredList as $transfer) {
+            $transferId = (int) $transfer['id'];
+            $uid = (int) $transfer['user_id'];
+            $token = strtoupper(trim((string) $transfer['token']));
+            $amount = (float) $transfer['amount'];
+            $destination = (string) $transfer['destination'];
+
+            // Concurrency-safe CAS claim
+            $claimed = $this->db->execute(
+                "UPDATE pending_transfers SET status = 'processing' WHERE id = ? AND status = 'pending' AND expires_at <= ?",
+                [$transferId, $now]
+            );
+
+            if ($claimed === 0) {
+                continue;
+            }
+
+            try {
+                $userSigningKey = $this->keyService->resolveSigningKey($transfer['encrypted_private_key'] ?? null);
+                $hotWalletKey = $this->keyService->resolveSigningKey(null);
+
+                $txSignature = $this->rpcService->broadcastTransfer($userSigningKey, $destination, $amount, $token, $hotWalletKey);
+
+                $this->db->transaction(function (Database $db) use ($transferId, $uid, $token, $amount, $txSignature) {
+                    $db->execute("UPDATE user_balances SET escrow = GREATEST(0, escrow - ?), updated_at = NOW() WHERE user_id = ? AND token = ?", [
+                        $amount, $uid, $token
+                    ]);
+
+                    $db->execute("UPDATE pending_transfers SET status = 'completed', tx_signature = ?, processed_at = NOW() WHERE id = ?", [
+                        $txSignature, $transferId
+                    ]);
+
+                    $platformFee = round($amount * 0.12, 6);
+                    self::creditPlatformFee($db, $transferId, $token, $platformFee, "Settlement for transfer #{$transferId}");
+                });
+
+                self::invalidateBalanceCache($uid);
+                $processed++;
+            } catch (\Throwable $e) {
+                // Revert balance and record failure
+                try {
+                    $this->db->transaction(function (Database $db) use ($transferId, $uid, $token, $amount, $e) {
+                        $platformFee = round($amount * 0.12, 6);
+                        $gasFee = 0.000005;
+
+                        if ($token === 'SOL') {
+                            $totalRefund = round($amount + $platformFee + $gasFee, 6);
+                            $db->execute("UPDATE user_balances SET escrow = GREATEST(0, escrow - ?), available = available + ?, updated_at = NOW() WHERE user_id = ? AND token = ?", [
+                                $amount, $totalRefund, $uid, 'SOL'
+                            ]);
+                        } else {
+                            $totalRefund = round($amount + $platformFee, 6);
+                            $db->execute("UPDATE user_balances SET escrow = GREATEST(0, escrow - ?), available = available + ?, updated_at = NOW() WHERE user_id = ? AND token = ?", [
+                                $amount, $totalRefund, $uid, $token
+                            ]);
+                            $db->execute("UPDATE user_balances SET available = available + ?, updated_at = NOW() WHERE user_id = ? AND token = ?", [
+                                $gasFee, $uid, 'SOL'
+                            ]);
+                        }
+
+                        $db->execute("UPDATE pending_transfers SET status = 'failed', failure_reason = ?, processed_at = NOW() WHERE id = ?", [
+                            $e->getMessage(), $transferId
+                        ]);
+                    });
+                    self::invalidateBalanceCache($uid);
+                } catch (\Throwable) {}
+            }
+        }
+
+        return $processed;
+    }
+
     /**
      * Consolidate bootstrap data (user details, multi-token balances, active pending holds,
      * transfer history, and threshold settings) in a single remote database round-trip.
@@ -662,6 +755,13 @@ class TransferService
             $this->syncUserDeposits($userId);
         } catch (\Throwable $e) {
             error_log("Bootstrap deposit sync notice: " . $e->getMessage());
+        }
+
+        // Opportunistic settlement: automatically process any expired pending transfers
+        try {
+            $this->processExpiredTransfers();
+        } catch (\Throwable $e) {
+            error_log("Bootstrap opportunistic settlement notice: " . $e->getMessage());
         }
 
         $sql = "SELECT 
@@ -822,7 +922,7 @@ class TransferService
         $totalCredited = 0;
 
         try {
-            $signatures = $this->rpcService->getSignaturesForAddress($depositAddress, 10);
+            $signatures = $this->rpcService->getSignaturesForAddress($depositAddress, 5);
             foreach ($signatures as $sigInfo) {
                 $txSig = is_array($sigInfo) ? ($sigInfo['signature'] ?? '') : (string) $sigInfo;
                 if ($txSig === '') {
@@ -832,6 +932,12 @@ class TransferService
                 // Check if already processed
                 $existing = $this->db->fetch('SELECT id FROM deposits WHERE tx_signature = ?', [$txSig]);
                 if ($existing) {
+                    continue;
+                }
+
+                // Check if this signature is an outgoing platform transfer
+                $isOutgoing = $this->db->fetch('SELECT id FROM pending_transfers WHERE tx_signature = ?', [$txSig]);
+                if ($isOutgoing) {
                     continue;
                 }
 
@@ -847,6 +953,14 @@ class TransferService
 
                 $depositDelta = $this->parseDepositDelta($txData, $depositAddress);
                 if (!$depositDelta) {
+                    // Record non-deposit signature as failed to avoid re-fetching RPC
+                    try {
+                        $this->db->execute(
+                            "INSERT INTO deposits (user_id, token, amount, tx_signature, status, created_at, confirmed_at) 
+                             VALUES (?, 'SOL', 0, ?, 'failed', NOW(), NOW())",
+                            [$userId, $txSig]
+                        );
+                    } catch (\Throwable) {}
                     continue;
                 }
 

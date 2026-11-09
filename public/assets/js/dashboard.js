@@ -335,6 +335,11 @@
     });
 
     if (res.status === 401) {
+      // Background and non-critical endpoints should throw without kicking user to login
+      if (endpoint.includes('/cron') || endpoint.includes('/admin/')) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Request unauthorized (401)');
+      }
       try { localStorage.removeItem('solrecall_session_token'); } catch (e) {}
       window.location.href = '/login';
       throw new Error('Authentication required. Redirecting to login...');
@@ -515,9 +520,20 @@
     const expired = AppState.pendingTransfers.filter(t => t.status !== 'pending' || calculateRemainingSeconds(t) <= 0);
     if (expired.length > 0) {
       AppState.pendingTransfers = AppState.pendingTransfers.filter(t => t.status === 'pending' && calculateRemainingSeconds(t) > 0);
-      apiFetch('/api/cron').catch(() => {});
-      apiFetch('/api/transfers/pending').catch(() => {});
-      apiFetch('/api/transfers/balances').catch(() => {});
+      apiFetch('/api/dashboard/bootstrap').then(bRes => {
+        if (bRes && bRes.success && bRes.data) {
+          if (bRes.data.balances) AppState.balances = bRes.data.balances;
+          if (Array.isArray(bRes.data.pending)) {
+            AppState.pendingTransfers = bRes.data.pending.filter(item => item.status === 'pending' && calculateRemainingSeconds(item) > 0);
+          }
+          if (Array.isArray(bRes.data.history)) {
+            AppState.historyTransfers = bRes.data.history;
+          }
+          renderHeaderAndBalances();
+          renderPendingTransfers();
+          renderHistoryTable();
+        }
+      }).catch(() => {});
     }
 
     if (AppState.pendingTransfers.length === 0) {
@@ -682,7 +698,6 @@
     } catch (e) {}
 
     // Trigger consolidated bootstrap sync to settle state with server
-    apiFetch('/api/cron').catch(() => {});
     apiFetch('/api/dashboard/bootstrap').then(bRes => {
       if (bRes && bRes.success && bRes.data) {
         if (bRes.data.balances) AppState.balances = bRes.data.balances;
@@ -750,10 +765,10 @@
     showToast('Undo window expired. Broadcaster processing on Solana...', 'info');
 
     try {
-      // Trigger cron broadcast on server
-      await apiFetch('/api/cron');
+      // Trigger bootstrap settlement on server
+      await apiFetch('/api/dashboard/bootstrap');
     } catch (err) {
-      console.warn('Cron broadcast trigger:', err.message);
+      console.warn('Settlement broadcast trigger:', err.message);
     }
 
     setTimeout(async () => {

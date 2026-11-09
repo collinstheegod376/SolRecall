@@ -137,7 +137,19 @@ class SolanaRpcService
 
         if (isset($decoded['error'])) {
             $msg = $decoded['error']['message'] ?? 'Unknown Solana RPC error';
-            throw new RuntimeException("Solana RPC error ({$method}): {$msg}", (int) ($decoded['error']['code'] ?? 0));
+            $details = '';
+            if (isset($decoded['error']['data'])) {
+                if (is_array($decoded['error']['data'])) {
+                    if (!empty($decoded['error']['data']['logs'])) {
+                        $details = ' - Logs: ' . implode('; ', array_slice($decoded['error']['data']['logs'], -3));
+                    } elseif (!empty($decoded['error']['data']['err'])) {
+                        $details = ' - Error: ' . json_encode($decoded['error']['data']['err']);
+                    }
+                } else {
+                    $details = ' - ' . (string) $decoded['error']['data'];
+                }
+            }
+            throw new RuntimeException("Solana RPC error ({$method}): {$msg}{$details}", (int) ($decoded['error']['code'] ?? 0));
         }
 
         return $decoded['result'] ?? null;
@@ -187,7 +199,8 @@ class SolanaRpcService
     public function sendTransaction(string $rawTxBase64, array $options = []): string
     {
         $opts = array_merge([
-            'skipPreflight' => false,
+            'skipPreflight' => true,
+            'maxRetries' => 5,
             'preflightCommitment' => $this->commitment,
             'encoding' => 'base64',
         ], $options);

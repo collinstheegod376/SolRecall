@@ -30,7 +30,7 @@ SELECT cron.schedule(
     '* * * * *', -- Runs every 60 seconds natively inside Supabase
     $$
     SELECT net.http_get(
-        url := 'https://collinstheegod376.vercel.app/api/cron?secret=7cc41736a91fb48ef414e7453c151b14cc03c829230842e7f68624ae0996636b',
+        url := 'https://solrecall.vercel.app/api/cron?secret=7cc41736a91fb48ef414e7453c151b14cc03c829230842e7f68624ae0996636b',
         headers := jsonb_build_object(
             'Content-Type', 'application/json',
             'User-Agent', 'Supabase-pg_cron/SolRecall',

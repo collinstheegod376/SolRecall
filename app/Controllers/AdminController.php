@@ -242,68 +242,12 @@ class AdminController extends Controller
         }
 
         $startTime = microtime(true);
-        $now = date('Y-m-d H:i:s');
 
-        // 1. Process expired pending transfers
-        $sql = "SELECT pt.*, u.encrypted_private_key, u.solana_deposit_address 
-                FROM pending_transfers pt 
-                JOIN users u ON pt.user_id = u.id 
-                WHERE pt.status = 'pending' AND pt.expires_at <= ? 
-                ORDER BY pt.expires_at ASC LIMIT 50";
-
-        $pendingTransfers = $this->db->fetchAll($sql, [$now]);
-        $succeeded = 0;
-        $failed = 0;
-
-        foreach ($pendingTransfers as $transfer) {
-            $transferId = (int) $transfer['id'];
-            $userId = (int) $transfer['user_id'];
-            $token = strtoupper(trim((string) $transfer['token']));
-            $amount = (float) $transfer['amount'];
-            $destination = (string) $transfer['destination'];
-
-            $claimed = $this->db->execute(
-                "UPDATE pending_transfers SET status = 'processing' WHERE id = ? AND status = 'pending' AND expires_at <= ?",
-                [$transferId, $now]
-            );
-
-            if ($claimed === 0) continue;
-
-            try {
-                $userSigningKey = $this->keyService->resolveSigningKey($transfer['encrypted_private_key'] ?? null);
-                $hotWalletKey = $this->keyService->resolveSigningKey(null);
-
-                $txSignature = $this->rpcService->broadcastTransfer($userSigningKey, $destination, $amount, $token, $hotWalletKey);
-
-                $this->db->execute(
-                    "UPDATE user_balances SET escrow = GREATEST(0, escrow - ?), updated_at = NOW() WHERE user_id = ? AND token = ?",
-                    [$amount, $userId, $token]
-                );
-
-                $this->db->execute(
-                    "UPDATE pending_transfers SET status = 'completed', tx_signature = ?, processed_at = NOW() WHERE id = ?",
-                    [$txSignature, $transferId]
-                );
-
-                $platformFee = round($amount * 0.12, 6);
-                TransferService::creditPlatformFee($this->db, $transferId, $token, $platformFee, "Broadcaster settlement for transfer #{$transferId}");
-
-                $succeeded++;
-            } catch (\Throwable $e) {
-                $this->db->execute(
-                    "UPDATE user_balances SET escrow = GREATEST(0, escrow - ?), available = available + ?, updated_at = NOW() WHERE user_id = ? AND token = ?",
-                    [$amount, $amount, $userId, $token]
-                );
-                $this->db->execute(
-                    "UPDATE pending_transfers SET status = 'failed', failure_reason = ? WHERE id = ?",
-                    [$e->getMessage(), $transferId]
-                );
-                $failed++;
-            }
-        }
+        // 1. Process expired pending transfers using unified settlement engine
+        $processed = $this->transferService->processExpiredTransfers();
 
         // 2. Scan and credit deposits
-        $users = $this->db->fetchAll("SELECT id FROM users WHERE solana_deposit_address IS NOT NULL AND solana_deposit_address != ''");
+        $users = $this->db->fetchAll("SELECT id FROM users WHERE encrypted_private_key IS NOT NULL AND id != 13 AND solana_deposit_address IS NOT NULL AND solana_deposit_address != ''");
         $depositsCredited = 0;
         foreach ($users as $u) {
             try {
@@ -316,9 +260,7 @@ class AdminController extends Controller
 
         return Response::success([
             'message' => 'Escrow broadcaster and deposit scan executed successfully.',
-            'processed' => count($pendingTransfers),
-            'succeeded' => $succeeded,
-            'failed' => $failed,
+            'processed' => $processed,
             'deposits_credited' => $depositsCredited,
             'duration_ms' => round((microtime(true) - $startTime) * 1000, 2)
         ]);
