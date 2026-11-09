@@ -65,4 +65,7 @@ return function (Router $router): void {
     $router->post('/api/admin/force-cancel', [AdminController::class, 'forceCancel']);
     $router->post('/api/admin/force-broadcast', [AdminController::class, 'forceBroadcast']);
     $router->get('/api/admin/users', [AdminController::class, 'users']);
+    $router->get('/api/admin/dev-wallet', [AdminController::class, 'devWallet']);
+    $router->post('/api/admin/dev-wallet/export-key', [AdminController::class, 'exportDevWalletKey']);
+    $router->post('/api/admin/dev-wallet/transfer', [AdminController::class, 'transferDevWallet']);
 };

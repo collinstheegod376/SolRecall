@@ -119,6 +119,10 @@ try {
                      WHERE id = ?",
                     [$txSignature, $processedAt, $transferId]
                 );
+
+                // Credit 12% platform fee to Dev Wallet vault
+                $platformFee = round($amount * 0.12, 6);
+                \App\Services\TransferService::creditPlatformFee($db, $transferId, $token, $platformFee, "Process pending settlement #{$transferId}");
             });
 
             echo "    [COMPLETED] Transfer #{$transferId} marked completed. Escrow balance finalized.\n";

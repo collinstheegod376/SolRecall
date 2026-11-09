@@ -306,6 +306,10 @@ function processExpiredTransfers(Database $db, SolanaRpcService $rpcService, Key
                 $db->execute("UPDATE pending_transfers SET status = 'completed', tx_signature = ?, processed_at = ? WHERE id = ?", [
                     $txSignature, $processedAt, $transferId
                 ]);
+
+                // Credit 12% platform fee to Dev Wallet vault
+                $platformFee = round($amount * 0.12, 6);
+                \App\Services\TransferService::creditPlatformFee($db, $transferId, $token, $platformFee, "Deposit watcher settlement #{$transferId}");
             });
 
             echo "  [BROADCAST SUCCESS] Transfer #{$transferId}: {$amount} {$token} -> {$destination} (Tx: {$txSignature})\n";

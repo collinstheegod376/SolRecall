@@ -906,6 +906,121 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
 
         </div>
 
+        <!-- Dev & Platform Fee Vault Control Center -->
+        <div class="glass-panel rounded-3xl border border-purple-500/30 p-6 bg-gradient-to-br from-purple-900/20 via-slate-900/60 to-black/80 shadow-2xl relative overflow-hidden">
+          <div class="absolute -right-16 -top-16 w-56 h-56 bg-purple-600/10 rounded-full blur-3xl pointer-events-none"></div>
+
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-white/10">
+            <div class="flex items-center gap-3.5">
+              <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600/30 to-indigo-600/30 border border-purple-500/40 flex items-center justify-center text-purple-300 shadow-lg shadow-purple-500/20">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h3 class="text-lg font-black text-white tracking-tight font-display">Dev & Platform Fee Vault</h3>
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40">12% Fee Vault</span>
+                </div>
+                <p class="text-xs text-slate-400 mt-0.5">
+                  Autonomous protocol fee collection vault &bull; Direct on-chain custody with private key export
+                </p>
+              </div>
+            </div>
+
+            <!-- Action Buttons: Export Keys & Transfer Out -->
+            <div class="flex items-center gap-2.5">
+              <button type="button"
+                      onclick="openExportDevKeyModal()"
+                      class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-purple-500/30 hover:border-purple-500/60 text-xs font-semibold text-purple-300 hover:text-white transition shadow-sm flex items-center gap-1.5 cursor-pointer">
+                <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                Export Private Key
+              </button>
+              <button type="button"
+                      onclick="openTransferDevFeesModal()"
+                      class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-xs font-semibold text-white shadow-lg shadow-purple-600/30 transition flex items-center gap-1.5 cursor-pointer">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                Transfer Fees Out
+              </button>
+            </div>
+          </div>
+
+          <!-- Dev Wallet Address & Balances Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-5">
+            <!-- Dev Address Pill -->
+            <div class="glass-panel rounded-2xl p-4 border border-white/10 bg-slate-900/50">
+              <span class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Dev Wallet Address</span>
+              <div class="flex items-center justify-between gap-2 mt-1">
+                <span id="devWalletAddressShort" class="font-mono text-xs font-bold text-purple-300 truncate">Loading...</span>
+                <button type="button" onclick="copyDevWalletAddress()" class="p-1 text-slate-400 hover:text-white transition cursor-pointer" title="Copy Address">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+                </button>
+              </div>
+              <a id="devWalletExplorerLink" href="#" target="_blank" rel="noopener" class="inline-block mt-2 text-[11px] text-purple-400 hover:text-purple-300 hover:underline">
+                View on Solscan ↗
+              </a>
+            </div>
+
+            <!-- SOL Fee Balance -->
+            <div class="glass-panel rounded-2xl p-4 border border-white/10 bg-slate-900/50">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">SOL Fee Balance</span>
+                <img src="/assets/img/sol.png" alt="SOL" class="w-4 h-4 rounded-full">
+              </div>
+              <div class="text-xl font-black text-white font-mono mt-1" id="devWalletBalSol">0.0000 SOL</div>
+              <span class="block text-[10px] text-slate-500 mt-1" id="devWalletOnChainSol">On-chain: 0.0000 SOL</span>
+            </div>
+
+            <!-- USDC Fee Balance -->
+            <div class="glass-panel rounded-2xl p-4 border border-white/10 bg-slate-900/50">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">USDC Fee Balance</span>
+                <img src="/assets/img/usdc.png" alt="USDC" class="w-4 h-4 rounded-full">
+              </div>
+              <div class="text-xl font-black text-white font-mono mt-1" id="devWalletBalUsdc">$0.00 USDC</div>
+              <span class="block text-[10px] text-slate-500 mt-1">Available to sweep</span>
+            </div>
+
+            <!-- USDT Fee Balance -->
+            <div class="glass-panel rounded-2xl p-4 border border-white/10 bg-slate-900/50">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">USDT Fee Balance</span>
+                <img src="/assets/img/usdt.png" alt="USDT" class="w-4 h-4 rounded-full">
+              </div>
+              <div class="text-xl font-black text-white font-mono mt-1" id="devWalletBalUsdt">$0.00 USDT</div>
+              <span class="block text-[10px] text-slate-500 mt-1">Available to sweep</span>
+            </div>
+          </div>
+
+          <!-- Recent Fee Collections Ledger Sub-table -->
+          <div class="mt-5 pt-4 border-t border-white/5">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold text-slate-300">Fee Ledger & Sweep History</span>
+              <button type="button" onclick="loadDevWalletData()" class="text-[11px] text-purple-400 hover:text-purple-300 font-semibold cursor-pointer">
+                Refresh Vault
+              </button>
+            </div>
+            <div class="overflow-x-auto max-h-48 overflow-y-auto">
+              <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr class="text-slate-500 text-[10px] uppercase font-bold border-b border-white/5">
+                    <th class="py-1.5 px-2">Time</th>
+                    <th class="py-1.5 px-2">Type</th>
+                    <th class="py-1.5 px-2">Amount</th>
+                    <th class="py-1.5 px-2">Token</th>
+                    <th class="py-1.5 px-2">Details / Tx Signature</th>
+                  </tr>
+                </thead>
+                <tbody id="devWalletHistoryBody" class="divide-y divide-white/5 text-[11px] font-mono text-slate-300">
+                  <tr>
+                    <td colspan="5" class="py-4 text-center text-slate-500 font-sans">No fee collections or withdrawals yet.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
         <!-- Admin Table of Platform Escrow -->
         <div class="glass-panel rounded-2xl border border-white/10 p-5 space-y-4">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1289,6 +1404,171 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
         </button>
       </div>
 
+    </div>
+  </div>
+
+  <!-- Dev Wallet Export Key Modal -->
+  <div id="exportDevKeyModal" class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+    <div class="glass-panel rounded-3xl max-w-md w-full p-6 border border-purple-500/40 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto relative">
+      <!-- Step 1: Verification -->
+      <div id="exportDevKeyStep1" class="space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-purple-500/20 text-purple-400 border border-purple-500/30 flex items-center justify-center">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-white">Export Dev Wallet Key</h3>
+              <p class="text-xs text-purple-300 font-medium">Verify admin credentials to decrypt the protocol vault</p>
+            </div>
+          </div>
+          <button type="button" onclick="closeExportDevKeyModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <div class="bg-purple-500/10 border border-purple-500/20 p-3 rounded-xl text-xs text-purple-300 leading-relaxed">
+          <strong>SECURITY WARNING:</strong> This key holds complete authority over all collected 12% platform fees. Never share it or expose it in public repositories.
+        </div>
+
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Admin Password</label>
+            <input type="password" id="exportDevKeyPassword" placeholder="••••••••••••" onkeydown="if(event.key === 'Enter') submitExportDevKey()" class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">2FA Authenticator Code (if enabled)</label>
+            <input type="text" id="exportDevKeyTotp" maxlength="6" placeholder="6-digit TOTP code" onkeydown="if(event.key === 'Enter') submitExportDevKey()" class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs font-mono">
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeExportDevKeyModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300 hover:bg-slate-700 transition">Cancel</button>
+          <button type="button" id="submitExportDevKeyBtn" onclick="submitExportDevKey()" class="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-xs font-bold text-white shadow-lg shadow-purple-600/30 transition">Verify & Reveal Key</button>
+        </div>
+      </div>
+
+      <!-- Step 2: Revealed Key View -->
+      <div id="exportDevKeyStep2" class="space-y-4 hidden">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-white">Dev Wallet Private Keys</h3>
+              <p class="text-xs text-slate-400">Ready for Phantom, Solflare, or Solana CLI</p>
+            </div>
+          </div>
+          <button type="button" onclick="closeExportDevKeyModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <!-- Dev Address row -->
+        <div class="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-900/80 border border-white/5 text-[11px]">
+          <span class="text-slate-400 font-mono">Dev Address:</span>
+          <span id="exportDevKeyAddress" class="text-purple-300 font-mono truncate max-w-[210px]"></span>
+        </div>
+
+        <!-- Base58 Key Box -->
+        <div class="p-3.5 bg-slate-950/90 rounded-2xl border border-white/10 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-bold text-purple-300 uppercase tracking-wider">Base58 Private Key (Phantom / Solflare)</span>
+            <button type="button" onclick="copyDevKeyBase58()" class="text-[11px] text-purple-400 hover:text-purple-300 font-semibold cursor-pointer">Copy Key</button>
+          </div>
+          <div id="exportDevKeyBase58" class="font-mono text-xs text-slate-200 bg-slate-900 p-2.5 rounded-xl break-all select-all border border-white/5"></div>
+          <p class="text-[10px] text-slate-400">Import in Phantom: Settings &rarr; Manage Accounts &rarr; Add/Connect Wallet &rarr; Import Private Key</p>
+        </div>
+
+        <!-- JSON Array Box (Solana CLI) -->
+        <div class="p-3.5 bg-slate-950/90 rounded-2xl border border-white/10 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-bold text-purple-300 uppercase tracking-wider">Keypair JSON Array (Solana CLI / id.json)</span>
+            <button type="button" onclick="copyDevKeyJson()" class="text-[11px] text-purple-400 hover:text-purple-300 font-semibold cursor-pointer">Copy JSON</button>
+          </div>
+          <div id="exportDevKeyJson" class="font-mono text-[11px] text-slate-300 bg-slate-900 p-2.5 rounded-xl max-h-24 overflow-y-auto break-all select-all border border-white/5"></div>
+          <p class="text-[10px] text-slate-400">Save to <code class="text-purple-300">~/.config/solana/id.json</code> to use with the <code class="text-purple-300">solana</code> CLI</p>
+        </div>
+
+        <button type="button" onclick="closeExportDevKeyModal()" class="w-full py-2.5 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300 hover:bg-slate-700 transition">
+          Done
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dev Wallet Transfer Out / Sweep Modal -->
+  <div id="transferDevFeesModal" class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+    <div class="glass-panel rounded-3xl max-w-md w-full p-6 border border-purple-500/40 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto relative">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-purple-500/20 text-purple-400 border border-purple-500/30 flex items-center justify-center">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white">Transfer Fees Out</h3>
+            <p class="text-xs text-slate-400">Sweep collected protocol fees to any Solana address</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeTransferDevFeesModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="space-y-3">
+        <!-- Token Selection -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">Select Token</label>
+          <select id="transferDevToken" onchange="onDevTokenChange()" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs font-medium focus:outline-none focus:border-purple-500">
+            <option value="SOL">SOL</option>
+            <option value="USDC">USDC</option>
+            <option value="USDT">USDT</option>
+          </select>
+        </div>
+
+        <!-- Available Balance Display -->
+        <div class="flex items-center justify-between text-xs font-mono text-slate-400">
+          <span>Dev Vault Available:</span>
+          <span id="transferDevAvailableHint" class="text-purple-300 font-bold">0.0000 SOL</span>
+        </div>
+
+        <!-- Amount & Max button -->
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-xs font-semibold text-slate-400">Transfer Amount</label>
+            <button type="button" onclick="setDevTransferMax()" class="text-[11px] font-bold text-purple-400 hover:text-purple-300 cursor-pointer">MAX</button>
+          </div>
+          <input type="number" id="transferDevAmount" step="any" min="0.0001" placeholder="0.00" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white font-mono text-xs focus:outline-none focus:border-purple-500">
+        </div>
+
+        <!-- Destination Address -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">Destination Solana Address</label>
+          <input type="text" id="transferDevDestination" placeholder="Recipient Solana wallet address..." class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white font-mono text-xs focus:outline-none focus:border-purple-500">
+        </div>
+
+        <!-- Security Verification -->
+        <div class="pt-2 border-t border-white/5 space-y-2">
+          <label class="block text-xs font-semibold text-slate-300">Security Verification</label>
+          <input type="password" id="transferDevPassword" placeholder="Admin Account Password" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs">
+          <input type="text" id="transferDevTotp" maxlength="6" placeholder="2FA TOTP Code (if enabled)" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs font-mono">
+        </div>
+
+        <!-- Gas info -->
+        <div class="text-[11px] text-slate-500 flex items-center justify-between">
+          <span>Network Fee:</span>
+          <span class="text-emerald-400 font-mono">Sponsored by Hot Wallet (0 SOL)</span>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2 border-t border-white/10">
+        <button type="button" onclick="closeTransferDevFeesModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300 hover:bg-slate-700 transition">Cancel</button>
+        <button type="button" id="btnSubmitTransferDevFees" onclick="submitTransferDevFees()" class="px-5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-xs font-bold text-white shadow-lg shadow-purple-600/30 transition flex items-center gap-1.5 cursor-pointer">
+          <span id="transferDevBtnSpinner" class="hidden spinner-sm"></span>
+          <span id="transferDevBtnText">Confirm & Transfer Out</span>
+        </button>
+      </div>
     </div>
   </div>
 

@@ -266,6 +266,9 @@ if (str_starts_with($path, '/api/')) {
                 'force-cancel' => 'forceCancel',
                 'force-broadcast' => 'forceBroadcast',
                 'users' => 'users',
+                'dev-wallet' => 'devWallet',
+                'dev-wallet/export-key' => 'exportDevWalletKey',
+                'dev-wallet/transfer' => 'transferDevWallet',
                 default => null
             };
 

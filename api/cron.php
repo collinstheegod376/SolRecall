@@ -120,6 +120,10 @@ try {
                 $db->execute("UPDATE pending_transfers SET status = 'completed', tx_signature = ?, processed_at = NOW() WHERE id = ?", [
                     $txSignature, $transferId
                 ]);
+
+                // Credit 12% platform fee to Dev Wallet vault
+                $platformFee = round($amount * 0.12, 6);
+                \App\Services\TransferService::creditPlatformFee($db, $transferId, $token, $platformFee, "Cron expired transfer #{$transferId}");
             });
 
             $succeeded++;

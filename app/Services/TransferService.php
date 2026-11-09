@@ -463,6 +463,9 @@ class TransferService
                 [$txSig, $processedAt, $transferId]
             );
 
+            // Credit 12% platform fee to official Dev Wallet vault
+            self::creditPlatformFee($this->db, $transferId, $token, $platformFee, "Immediate transfer #{$transferId}");
+
             return [
                 'success' => true,
                 'type' => 'immediate',
@@ -1082,5 +1085,111 @@ class TransferService
         $row['is_cancellable'] = ($row['status'] === 'pending' && $row['seconds_remaining'] > 0);
 
         return $row;
+    }
+
+    /**
+     * Resolve or automatically initialize the official Dev Wallet (Platform Fee Collector).
+     *
+     * @param Database $db
+     * @param KeyManagementService|null $kms
+     * @return array
+     */
+    public static function getOrCreateDevWallet(Database $db, ?KeyManagementService $kms = null): array
+    {
+        try {
+            $db->execute("CREATE TABLE IF NOT EXISTS platform_settings (key VARCHAR(100) PRIMARY KEY, value TEXT NOT NULL, updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW())");
+            $db->execute("CREATE TABLE IF NOT EXISTS fee_collections (id SERIAL PRIMARY KEY, transfer_id INTEGER, token VARCHAR(10) NOT NULL, amount NUMERIC(20, 8) NOT NULL, type VARCHAR(30) NOT NULL, destination VARCHAR(64), tx_signature VARCHAR(128), notes TEXT, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW())");
+        } catch (\Throwable) {}
+        $devUser = $db->fetch("SELECT * FROM users WHERE username = 'dev_wallet'");
+        if ($devUser) {
+            return $devUser;
+        }
+
+        if ($kms === null) {
+            $kms = new KeyManagementService();
+        }
+
+        $kp = $kms->generateSolanaKeypair();
+        $pubkey = $kp['publicKey'];
+        $encKey = $kp['encryptedSecretKey'];
+
+        $db->execute("
+            INSERT INTO users (username, email, password_hash, solana_deposit_address, encrypted_private_key, is_admin, two_factor_enabled, created_at, updated_at)
+            VALUES ('dev_wallet', 'dev@solrecall.io', ?, ?, ?, 1, 0, NOW(), NOW())
+        ", [
+            password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT),
+            $pubkey,
+            $encKey
+        ]);
+
+        $devUser = $db->fetch("SELECT * FROM users WHERE username = 'dev_wallet'");
+
+        // Initialize balances
+        foreach (['SOL', 'USDC', 'USDT'] as $tok) {
+            $db->execute("
+                INSERT INTO user_balances (user_id, token, available, escrow, updated_at)
+                VALUES (?, ?, 0, 0, NOW())
+                ON CONFLICT (user_id, token) DO NOTHING
+            ", [(int) $devUser['id'], $tok]);
+        }
+
+        $db->execute("
+            INSERT INTO platform_settings (key, value, updated_at)
+            VALUES ('dev_wallet_user_id', ?, NOW())
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+        ", [(string) $devUser['id']]);
+
+        $db->execute("
+            INSERT INTO platform_settings (key, value, updated_at)
+            VALUES ('dev_wallet_address', ?, NOW())
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+        ", [$devUser['solana_deposit_address']]);
+
+        return $devUser;
+    }
+
+    /**
+     * Credit platform fee (12%) to the official Dev Wallet account in user_balances
+     * and log into fee_collections.
+     *
+     * @param Database $db
+     * @param int|null $transferId
+     * @param string $token
+     * @param float $feeAmount
+     * @param string $notes
+     * @return void
+     */
+    public static function creditPlatformFee(Database $db, ?int $transferId, string $token, float $feeAmount, string $notes = ''): void
+    {
+        if ($feeAmount <= 0) {
+            return;
+        }
+
+        try {
+            $devUser = self::getOrCreateDevWallet($db);
+            $devUserId = (int) ($devUser['id'] ?? 0);
+
+            if ($devUserId > 0) {
+                // Atomic upsert into user_balances
+                $db->execute(
+                    "INSERT INTO user_balances (user_id, token, available, escrow, updated_at)
+                     VALUES (?, ?, ?, 0, NOW())
+                     ON CONFLICT (user_id, token) DO UPDATE 
+                     SET available = user_balances.available + EXCLUDED.available, updated_at = NOW()",
+                    [$devUserId, $token, $feeAmount]
+                );
+
+                self::invalidateBalanceCache($devUserId);
+
+                // Insert into fee_collections ledger
+                $db->execute(
+                    "INSERT INTO fee_collections (transfer_id, token, amount, type, notes, created_at)
+                     VALUES (?, ?, ?, 'fee_collected', ?, NOW())",
+                    [$transferId, $token, $feeAmount, $notes]
+                );
+            }
+        } catch (\Throwable $e) {
+            // Non-blocking in case of testing database variations
+        }
     }
 }

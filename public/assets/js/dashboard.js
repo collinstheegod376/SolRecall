@@ -2177,15 +2177,19 @@
 
   let adminTransfersCache = [];
 
+  let currentDevWalletData = null;
+  let devKeyExportData = null;
+
   async function loadAdminData(force = false) {
     if (!AppState.user || !AppState.user.is_admin) {
       return;
     }
 
     try {
-      const [statsRes, transfersRes] = await Promise.all([
+      const [statsRes, transfersRes, devWalletRes] = await Promise.all([
         apiFetch('/api/admin/stats'),
-        apiFetch('/api/admin/transfers')
+        apiFetch('/api/admin/transfers'),
+        apiFetch('/api/admin/dev-wallet')
       ]);
 
       if (statsRes && statsRes.success && statsRes.data) {
@@ -2195,6 +2199,11 @@
       if (transfersRes && transfersRes.success && transfersRes.data) {
         adminTransfersCache = transfersRes.data.transfers || [];
         renderAdminTransfers(adminTransfersCache);
+      }
+
+      if (devWalletRes && devWalletRes.success && devWalletRes.data) {
+        currentDevWalletData = devWalletRes.data;
+        renderDevWalletData(devWalletRes.data);
       }
     } catch (err) {
       console.warn('[Admin] Failed to load admin operations data:', err);
@@ -2677,4 +2686,288 @@
     init();
   }
 
+
+  // =========================================================================
+  // Dev & Platform Fee Vault UI Controller (Export Key & Transfer Out)
+  // =========================================================================
+
+  async function loadDevWalletData() {
+    try {
+      const res = await apiFetch('/api/admin/dev-wallet');
+      if (res && res.success && res.data) {
+        currentDevWalletData = res.data;
+        renderDevWalletData(res.data);
+      }
+    } catch (err) {
+      console.warn('[DevWallet] Error loading dev wallet data:', err);
+    }
+  }
+  window.loadDevWalletData = loadDevWalletData;
+
+  function renderDevWalletData(data) {
+    if (!data) return;
+    const w = data.wallet || {};
+    const b = data.balances || {};
+    const hist = data.history || [];
+
+    const addrEl = document.getElementById('devWalletAddressShort');
+    const linkEl = document.getElementById('devWalletExplorerLink');
+    if (addrEl && w.address) {
+      addrEl.textContent = `${w.address.slice(0, 6)}...${w.address.slice(-6)}`;
+      addrEl.title = w.address;
+    }
+    if (linkEl && w.address) {
+      linkEl.href = `https://solscan.io/account/${w.address}`;
+    }
+
+    const solAvail = b.SOL ? (b.SOL.available || 0) : 0;
+    const solOnChain = b.SOL ? (b.SOL.on_chain || 0) : 0;
+    const usdcAvail = b.USDC ? (b.USDC.available || 0) : 0;
+    const usdtAvail = b.USDT ? (b.USDT.available || 0) : 0;
+
+    const balSolEl = document.getElementById('devWalletBalSol');
+    const onChainSolEl = document.getElementById('devWalletOnChainSol');
+    const balUsdcEl = document.getElementById('devWalletBalUsdc');
+    const balUsdtEl = document.getElementById('devWalletBalUsdt');
+
+    if (balSolEl) balSolEl.textContent = `${formatAmount(solAvail, 4)} SOL`;
+    if (onChainSolEl) onChainSolEl.textContent = `On-chain: ${formatAmount(solOnChain, 4)} SOL`;
+    if (balUsdcEl) balUsdcEl.textContent = `$${formatAmount(usdcAvail, 2)} USDC`;
+    if (balUsdtEl) balUsdtEl.textContent = `$${formatAmount(usdtAvail, 2)} USDT`;
+
+    // History table
+    const tbody = document.getElementById('devWalletHistoryBody');
+    if (tbody) {
+      if (hist.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-slate-500 font-sans">No fee collections or withdrawals yet.</td></tr>`;
+      } else {
+        tbody.innerHTML = hist.map(h => {
+          const isCollected = h.type === 'fee_collected';
+          const typeBadge = isCollected
+            ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">Fee In (12%)</span>`
+            : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">Sweep Out</span>`;
+          const time = h.created_at ? new Date(h.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-';
+          const txShort = h.tx_signature
+            ? `<a href="https://solscan.io/tx/${h.tx_signature}" target="_blank" rel="noopener" class="text-purple-400 hover:text-purple-300 underline font-mono text-[10px]">${h.tx_signature.slice(0, 10)}... ↗</a>`
+            : (escapeHtml(h.notes || 'Internal Fee'));
+
+          return `
+            <tr class="hover:bg-white/[0.02] transition">
+              <td class="py-2 px-2 text-slate-400 font-mono text-[10px]">${time}</td>
+              <td class="py-2 px-2">${typeBadge}</td>
+              <td class="py-2 px-2 font-bold ${isCollected ? 'text-emerald-400' : 'text-amber-400'}">${isCollected ? '+' : '-'}${formatAmount(h.amount, 6)}</td>
+              <td class="py-2 px-2 text-slate-300">${escapeHtml(h.token)}</td>
+              <td class="py-2 px-2 text-slate-400 truncate max-w-[200px]">${txShort}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+    }
+  }
+
+  function copyDevWalletAddress() {
+    if (currentDevWalletData && currentDevWalletData.wallet && currentDevWalletData.wallet.address) {
+      copyToClipboard(currentDevWalletData.wallet.address, 'Dev Wallet Address');
+    }
+  }
+  window.copyDevWalletAddress = copyDevWalletAddress;
+
+  // Export Dev Key Modal Handlers
+  function openExportDevKeyModal() {
+    const modal = document.getElementById('exportDevKeyModal');
+    const step1 = document.getElementById('exportDevKeyStep1');
+    const step2 = document.getElementById('exportDevKeyStep2');
+    const pwd = document.getElementById('exportDevKeyPassword');
+    const totp = document.getElementById('exportDevKeyTotp');
+
+    if (pwd) pwd.value = '';
+    if (totp) totp.value = '';
+    if (step1) step1.classList.remove('hidden');
+    if (step2) step2.classList.add('hidden');
+    if (modal) modal.classList.remove('hidden');
+    if (pwd) pwd.focus();
+  }
+  window.openExportDevKeyModal = openExportDevKeyModal;
+
+  function closeExportDevKeyModal() {
+    const modal = document.getElementById('exportDevKeyModal');
+    if (modal) modal.classList.add('hidden');
+    devKeyExportData = null;
+  }
+  window.closeExportDevKeyModal = closeExportDevKeyModal;
+
+  async function submitExportDevKey() {
+    const btn = document.getElementById('submitExportDevKeyBtn');
+    const pwdInput = document.getElementById('exportDevKeyPassword');
+    const totpInput = document.getElementById('exportDevKeyTotp');
+
+    const password = pwdInput ? pwdInput.value : '';
+    const totp_code = totpInput ? totpInput.value.trim() : '';
+
+    if (!password && !totp_code) {
+      showToast('Please enter your admin password or 2FA code.', 'error');
+      return;
+    }
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner-sm inline-block mr-1"></span> Verifying...`;
+    }
+
+    try {
+      const res = await apiFetch('/api/admin/dev-wallet/export-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, totp_code })
+      });
+
+      if (res && res.success && res.data) {
+        devKeyExportData = res.data;
+        const step1 = document.getElementById('exportDevKeyStep1');
+        const step2 = document.getElementById('exportDevKeyStep2');
+        const addrEl = document.getElementById('exportDevKeyAddress');
+        const b58El = document.getElementById('exportDevKeyBase58');
+        const jsonEl = document.getElementById('exportDevKeyJson');
+
+        if (addrEl) addrEl.textContent = res.data.address;
+        if (b58El) b58El.textContent = res.data.private_key_base58;
+        if (jsonEl) jsonEl.textContent = JSON.stringify(res.data.private_key_json);
+
+        if (step1) step1.classList.add('hidden');
+        if (step2) step2.classList.remove('hidden');
+        showToast('Dev Wallet key successfully decrypted!', 'success');
+      } else {
+        showToast(res.error || 'Authentication failed.', 'error');
+      }
+    } catch (err) {
+      showToast(err.message || 'Error exporting key.', 'error');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `Verify & Reveal Key`;
+      }
+    }
+  }
+  window.submitExportDevKey = submitExportDevKey;
+
+  function copyDevKeyBase58() {
+    if (devKeyExportData && devKeyExportData.private_key_base58) {
+      copyToClipboard(devKeyExportData.private_key_base58, 'Dev Base58 Private Key');
+    }
+  }
+  window.copyDevKeyBase58 = copyDevKeyBase58;
+
+  function copyDevKeyJson() {
+    if (devKeyExportData && devKeyExportData.private_key_json) {
+      copyToClipboard(JSON.stringify(devKeyExportData.private_key_json), 'Dev Keypair JSON');
+    }
+  }
+  window.copyDevKeyJson = copyDevKeyJson;
+
+  // Transfer Dev Fees Modal Handlers
+  function openTransferDevFeesModal() {
+    const modal = document.getElementById('transferDevFeesModal');
+    const pwd = document.getElementById('transferDevPassword');
+    const totp = document.getElementById('transferDevTotp');
+    const dest = document.getElementById('transferDevDestination');
+    const amt = document.getElementById('transferDevAmount');
+
+    if (pwd) pwd.value = '';
+    if (totp) totp.value = '';
+    if (dest) dest.value = '';
+    if (amt) amt.value = '';
+
+    onDevTokenChange();
+    if (modal) modal.classList.remove('hidden');
+  }
+  window.openTransferDevFeesModal = openTransferDevFeesModal;
+
+  function closeTransferDevFeesModal() {
+    const modal = document.getElementById('transferDevFeesModal');
+    if (modal) modal.classList.add('hidden');
+  }
+  window.closeTransferDevFeesModal = closeTransferDevFeesModal;
+
+  function onDevTokenChange() {
+    const tokenSelect = document.getElementById('transferDevToken');
+    const hint = document.getElementById('transferDevAvailableHint');
+    if (!tokenSelect || !hint) return;
+
+    const token = tokenSelect.value || 'SOL';
+    const balances = currentDevWalletData?.balances || {};
+    const avail = balances[token] ? (balances[token].available || 0) : 0;
+
+    hint.textContent = `${formatAmount(avail, token === 'SOL' ? 4 : 2)} ${token}`;
+  }
+  window.onDevTokenChange = onDevTokenChange;
+
+  function setDevTransferMax() {
+    const tokenSelect = document.getElementById('transferDevToken');
+    const amtInput = document.getElementById('transferDevAmount');
+    if (!tokenSelect || !amtInput) return;
+
+    const token = tokenSelect.value || 'SOL';
+    const balances = currentDevWalletData?.balances || {};
+    const avail = balances[token] ? (balances[token].available || 0) : 0;
+
+    amtInput.value = avail;
+  }
+  window.setDevTransferMax = setDevTransferMax;
+
+  async function submitTransferDevFees() {
+    const tokenSelect = document.getElementById('transferDevToken');
+    const amtInput = document.getElementById('transferDevAmount');
+    const destInput = document.getElementById('transferDevDestination');
+    const pwdInput = document.getElementById('transferDevPassword');
+    const totpInput = document.getElementById('transferDevTotp');
+    const btn = document.getElementById('btnSubmitTransferDevFees');
+    const spinner = document.getElementById('transferDevBtnSpinner');
+    const btnText = document.getElementById('transferDevBtnText');
+
+    const token = tokenSelect ? tokenSelect.value : 'SOL';
+    const amount = amtInput ? parseFloat(amtInput.value) : 0;
+    const destination = destInput ? destInput.value.trim() : '';
+    const password = pwdInput ? pwdInput.value : '';
+    const totp_code = totpInput ? totpInput.value.trim() : '';
+
+    if (!destination) {
+      showToast('Please enter a destination Solana address.', 'error');
+      return;
+    }
+    if (!amount || amount <= 0) {
+      showToast('Please enter a valid transfer amount.', 'error');
+      return;
+    }
+    if (!password && !totp_code) {
+      showToast('Please enter your admin password or 2FA code.', 'error');
+      return;
+    }
+
+    if (btn) btn.disabled = true;
+    if (spinner) spinner.classList.remove('hidden');
+    if (btnText) btnText.textContent = 'Broadcasting on Solana Mainnet...';
+
+    try {
+      const res = await apiFetch('/api/admin/dev-wallet/transfer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, amount, destination, password, totp_code })
+      });
+
+      if (res && res.success) {
+        showToast(`Swept ${amount} ${token} successfully! Tx: ${res.data?.tx_signature?.slice(0, 10)}...`, 'success', 7000);
+        closeTransferDevFeesModal();
+        await loadAdminData(true);
+      } else {
+        showToast(res.error || 'Failed to transfer fees.', 'error');
+      }
+    } catch (err) {
+      showToast(err.message || 'Error submitting transfer.', 'error');
+    } finally {
+      if (btn) btn.disabled = false;
+      if (spinner) spinner.classList.add('hidden');
+      if (btnText) btnText.textContent = 'Confirm & Transfer Out';
+    }
+  }
+  window.submitTransferDevFees = submitTransferDevFees;
 })();
