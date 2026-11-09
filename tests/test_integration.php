@@ -126,7 +126,7 @@ echo "[OK] Test users and balances seeded.\n";
 $rpcService = new SolanaRpcService(null, null, 5, true); // force simulation
 $destinationPubkey = '83astBRguLMdt2h5U1Tpdq5LM9KuKHLuGTu2uCpWbhQA';
 
-$ataUsdc = $rpcService->findAssociatedTokenAddress($destinationPubkey, '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
+$ataUsdc = $rpcService->findAssociatedTokenAddress($destinationPubkey, 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
 echo "[OK] Derived Associated Token Account for USDC: {$ataUsdc}\n";
 assert(strlen($ataUsdc) >= 32);
 

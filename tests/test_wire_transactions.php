@@ -48,7 +48,7 @@ assert($numSigs === 2, "Expected 2 signatures in sponsored wire transaction");
 
 // 2. Test SPL Token Transfer (USDC) with ATA Idempotent Creation & Fee Sponsorship
 echo "Building SPL Transfer (USDC) with Idempotent ATA Instruction + Hot Wallet Fee Sponsor...\n";
-$usdcMint = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
+$usdcMint = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 $splTx = $rpc->buildAndSignSplTransfer($userSecret, $destPubkey, 25.0, $usdcMint, 6, $hotSecret, $mockBlockhash);
 echo "  [SUCCESS] Wire Tx Base64 length: " . strlen($splTx['txBase64']) . "\n";
 echo "  [SUCCESS] Tx Signature: {$splTx['signature']}\n\n";

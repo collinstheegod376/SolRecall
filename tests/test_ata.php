@@ -89,7 +89,7 @@ function findProgramAddress(array $seeds, string $programIdBase58): array
 }
 
 $wallet = '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU';
-$mint = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
+$mint = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 $tokenProgram = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 $ataProgram = 'ATokenGPvbdGVxr1b2hvZbsiqW5P428224796412';
 

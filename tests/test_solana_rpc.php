@@ -25,7 +25,7 @@ echo "Recent Blockhash: {$bh['blockhash']}\n";
 assert(!empty($bh['blockhash']));
 
 // 3. Test ATA Derivation
-$ata = $rpc->findAssociatedTokenAddress($receiver['publicKey'], '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
+$ata = $rpc->findAssociatedTokenAddress($receiver['publicKey'], 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
 echo "Derived USDC ATA for Receiver: {$ata}\n";
 assert(strlen($ata) >= 32);
 

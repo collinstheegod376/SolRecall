@@ -144,8 +144,8 @@ function parseTransactionDepositDelta(array $tx, string $depositAddress): ?array
         return null;
     }
 
-    $usdcMint = (string) config('tokens.USDC.mint', '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
-    $usdtMint = (string) config('tokens.USDT.mint', 'EJwZgeZrdCraqiSCdtXYWhWsvQTxZeQXP3ZvGWcvppgw');
+    $usdcMint = (string) config('tokens.USDC.mint', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+    $usdtMint = (string) config('tokens.USDT.mint', 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB');
 
     // 1. Check SPL Token Balances (postTokenBalances vs preTokenBalances)
     if (!empty($meta['postTokenBalances']) && is_array($meta['postTokenBalances'])) {
