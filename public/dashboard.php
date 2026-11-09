@@ -50,22 +50,23 @@ $ssrSettings = ['undoWindowMinutes' => 10];
 
 try {
     $transferService = new \App\Services\TransferService();
-    $fetchedBalances = $transferService->getUserBalances($userId);
-    if (!empty($fetchedBalances)) {
-        $ssrBalances = $fetchedBalances;
-        if (isset($ssrBalances['SOL']) && !isset($ssrBalances['SOL']['price'])) {
-            $ssrBalances['SOL']['price'] = 185.0;
-        }
-        if (isset($ssrBalances['USDC']) && !isset($ssrBalances['USDC']['price'])) {
-            $ssrBalances['USDC']['price'] = 1.0;
-        }
-        if (isset($ssrBalances['USDT']) && !isset($ssrBalances['USDT']['price'])) {
-            $ssrBalances['USDT']['price'] = 1.0;
-        }
+    // Fast path: check $_SESSION['cached_bootstrap'][$userId] first (0ms instantaneous load)
+    if (!empty($_SESSION['cached_bootstrap'][$userId]) && is_array($_SESSION['cached_bootstrap'][$userId])) {
+        $cachedBoot = $_SESSION['cached_bootstrap'][$userId];
+        if (!empty($cachedBoot['balances'])) $ssrBalances = $cachedBoot['balances'];
+        if (isset($cachedBoot['pending'])) $ssrPending = $cachedBoot['pending'];
+        if (isset($cachedBoot['history'])) $ssrHistory = $cachedBoot['history'];
+        if (isset($cachedBoot['settings'])) $ssrSettings = $cachedBoot['settings'];
+    } else {
+        $bootstrapData = $transferService->getBootstrapData($userId);
+        if (!empty($bootstrapData['balances'])) $ssrBalances = $bootstrapData['balances'];
+        if (isset($bootstrapData['pending'])) $ssrPending = $bootstrapData['pending'];
+        if (isset($bootstrapData['history'])) $ssrHistory = $bootstrapData['history'];
+        if (isset($bootstrapData['settings'])) $ssrSettings = $bootstrapData['settings'];
     }
-    $ssrPending = $transferService->getPendingTransfers($userId);
-    $ssrHistory = $transferService->getTransferHistory($userId, 20);
-    $ssrSettings = ['undoWindowMinutes' => (int) config('undo_window.default_minutes', 10)];
+    if (isset($ssrBalances['SOL']) && !isset($ssrBalances['SOL']['price'])) $ssrBalances['SOL']['price'] = 185.0;
+    if (isset($ssrBalances['USDC']) && !isset($ssrBalances['USDC']['price'])) $ssrBalances['USDC']['price'] = 1.0;
+    if (isset($ssrBalances['USDT']) && !isset($ssrBalances['USDT']['price'])) $ssrBalances['USDT']['price'] = 1.0;
 } catch (\Throwable $e) {
     // Graceful fallback to default values
 }
@@ -848,7 +849,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
                 <img src="/assets/img/sol.png" onerror="this.src='/assets/img/sol.png'" alt="SOL" class="w-3.5 h-3.5 rounded-full inline">
                 Hot Wallet SOL
               </span>
-              <span class="w-2 h-2 rounded-full bg-emerald-400" title="Connected to Solana Mainnet"></span>
+              <span class="inline-flex items-center gap-1.5 text-[11px] text-emerald-400 font-medium font-sans" title="Connected to Solana Mainnet"><span class="w-2 h-2 rounded-full bg-emerald-400"></span><span>Connected to Solana Mainnet</span></span>
             </div>
             <div class="text-2xl font-black text-white font-mono mt-1" id="adminHotWalletSol">
               0.0000 <span class="text-xs text-slate-400 font-normal">SOL</span>
@@ -1406,6 +1407,15 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
             </div>
           </div>
 
+          <!-- Transfer Status Badge -->
+          <div class="flex items-center justify-between text-xs pt-2.5 border-t border-white/5">
+            <span class="text-slate-400 font-medium">Status:</span>
+            <span id="receiptStatusBadge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+              <span id="receiptStatusDot" class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+              <span id="receiptStatusText">Pending Escrow</span>
+            </span>
+          </div>
+
           <!-- Undo Timelock Duration Badge -->
           <div class="flex items-center justify-between text-xs pt-2.5 border-t border-white/5">
             <span class="text-slate-400 font-medium">Timelock Window:</span>
@@ -1415,6 +1425,27 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
               </svg>
               <span id="receiptWindowText">10m Undo Window Active</span>
             </span>
+          </div>
+
+          <!-- Platform Fee (12%) -->
+          <div class="flex items-center justify-between text-xs pt-2.5 border-t border-white/5">
+            <span class="text-slate-400 font-medium">Platform Fee (12%):</span>
+            <span id="receiptFeeValue" class="font-mono text-amber-300 font-semibold">+0.0000 SOL</span>
+          </div>
+
+          <!-- Network Gas -->
+          <div class="flex items-center justify-between text-xs pt-2.5 border-t border-white/5">
+            <span class="text-slate-400 font-medium">Network Gas:</span>
+            <span id="receiptGasValue" class="font-mono text-slate-300 font-semibold">0.000005 SOL</span>
+          </div>
+
+          <!-- Solana Mainnet Explorer Link -->
+          <div class="flex items-center justify-between text-xs pt-2.5 border-t border-white/5">
+            <span class="text-slate-400 font-medium">Solana Explorer:</span>
+            <a id="receiptExplorerLink" href="https://solscan.io/" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 font-mono text-purple-400 hover:text-purple-300 hover:underline">
+              <span id="receiptExplorerLinkText">View on Solscan</span>
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+            </a>
           </div>
 
           <!-- Note/Memo row (if present) -->

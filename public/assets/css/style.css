@@ -204,7 +204,22 @@ code, .font-mono {
   to { transform: rotate(360deg); }
 }
 
-/* Custom Tab styling */
+/* Custom Tab styling & Zero-Flicker Transitions */
+.dashboard-tab-content {
+  animation: tabFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes tabFadeIn {
+  from {
+    opacity: 0.2;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .nav-tab-active {
   color: #ffffff;
   border-bottom: 2px solid #9945FF;

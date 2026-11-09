@@ -641,16 +641,10 @@ class TransferService
      */
     public function getBootstrapData(int $userId, bool $forceFresh = false): array
     {
-        // Automatically scan and credit on-chain incoming deposits
-        try {
-            $this->syncUserDeposits($userId);
-        } catch (\Throwable $e) {
-            error_log("Bootstrap deposit sync notice: " . $e->getMessage());
-        }
-
         $now = time();
         $ttl = 12; // 12-second session micro-cache
 
+        // Instant 0ms cache return when within session TTL
         if (session_status() === PHP_SESSION_ACTIVE && !$forceFresh) {
             if (
                 isset($_SESSION['cached_bootstrap'][$userId], $_SESSION['cached_bootstrap_time'][$userId]) &&
@@ -658,6 +652,13 @@ class TransferService
             ) {
                 return $_SESSION['cached_bootstrap'][$userId];
             }
+        }
+
+        // Automatically scan and credit on-chain incoming deposits on cold cache/refresh
+        try {
+            $this->syncUserDeposits($userId);
+        } catch (\Throwable $e) {
+            error_log("Bootstrap deposit sync notice: " . $e->getMessage());
         }
 
         $sql = "SELECT 
@@ -732,7 +733,7 @@ class TransferService
                 $_SESSION['cached_bootstrap_time'] = [];
             }
             $_SESSION['cached_bootstrap'][$userId] = $result;
-            $_SESSION['cached_bootstrap_time'][$userId] = $now;
+            $_SESSION['cached_bootstrap_time'][$userId] = time();
 
             // Also synchronize cached_balances
             if (!isset($_SESSION['cached_balances'])) {
@@ -740,7 +741,7 @@ class TransferService
                 $_SESSION['cached_balances_time'] = [];
             }
             $_SESSION['cached_balances'][$userId] = $formattedBalances;
-            $_SESSION['cached_balances_time'][$userId] = $now;
+            $_SESSION['cached_balances_time'][$userId] = time();
         }
 
         return $result;
@@ -797,7 +798,7 @@ class TransferService
                 $_SESSION['cached_balances_time'] = [];
             }
             $_SESSION['cached_balances'][$userId] = $result;
-            $_SESSION['cached_balances_time'][$userId] = $now;
+            $_SESSION['cached_balances_time'][$userId] = time();
         }
 
         return $result;

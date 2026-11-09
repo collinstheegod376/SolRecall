@@ -20,7 +20,11 @@ $clientIp = $_SERVER['REMOTE_ADDR'] ?? '';
 $isLocal = in_array($clientIp, ['127.0.0.1', '::1', 'localhost'], true) || (php_sapi_name() === 'cli');
 
 if ($cronSecret && !$isLocal) {
-    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+    if ($authHeader === '' && function_exists('getallheaders')) {
+        $headers = getallheaders();
+        $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+    }
     $querySecret = $_GET['secret'] ?? '';
     $bearerMatch = preg_match('/Bearer\s+(\S+)/i', $authHeader, $matches) ? $matches[1] : '';
     $isAuthorized = ($bearerMatch !== '' && hash_equals($cronSecret, $bearerMatch))
@@ -107,26 +111,47 @@ try {
                 $hotWalletKey
             );
 
-            // Deduct escrow balance
-            $db->execute("UPDATE user_balances SET escrow = GREATEST(0, escrow - ?), updated_at = NOW() WHERE user_id = ? AND token = ?", [
-                $amount, $userId, $token
-            ]);
+            // Deduct escrow balance & mark completed atomically
+            $db->transaction(function (Database $db) use ($transferId, $userId, $token, $amount, $txSignature) {
+                $db->execute("UPDATE user_balances SET escrow = GREATEST(0, escrow - ?), updated_at = NOW() WHERE user_id = ? AND token = ?", [
+                    $amount, $userId, $token
+                ]);
 
-            // Mark completed
-            $db->execute("UPDATE pending_transfers SET status = 'completed', tx_signature = ?, processed_at = NOW() WHERE id = ?", [
-                $txSignature, $transferId
-            ]);
+                $db->execute("UPDATE pending_transfers SET status = 'completed', tx_signature = ?, processed_at = NOW() WHERE id = ?", [
+                    $txSignature, $transferId
+                ]);
+            });
 
             $succeeded++;
         } catch (\Throwable $e) {
-            // Revert funds back to available
-            $db->execute("UPDATE user_balances SET escrow = GREATEST(0, escrow - ?), available = available + ?, updated_at = NOW() WHERE user_id = ? AND token = ?", [
-                $amount, $amount, $userId, $token
-            ]);
+            // Revert funds AND platform/gas fees back to available balance (zero funds leaked)
+            try {
+                $db->transaction(function (Database $db) use ($transferId, $userId, $token, $amount, $e) {
+                    $platformFee = round($amount * 0.12, 6);
+                    $gasFee = 0.000005;
 
-            $db->execute("UPDATE pending_transfers SET status = 'failed', failure_reason = ? WHERE id = ?", [
-                $e->getMessage(), $transferId
-            ]);
+                    if ($token === 'SOL') {
+                        $totalRefund = round($amount + $platformFee + $gasFee, 6);
+                        $db->execute("UPDATE user_balances SET escrow = GREATEST(0, escrow - ?), available = available + ?, updated_at = NOW() WHERE user_id = ? AND token = ?", [
+                            $amount, $totalRefund, $userId, 'SOL'
+                        ]);
+                    } else {
+                        $totalRefundToken = round($amount + $platformFee, 6);
+                        $db->execute("UPDATE user_balances SET escrow = GREATEST(0, escrow - ?), available = available + ?, updated_at = NOW() WHERE user_id = ? AND token = ?", [
+                            $amount, $totalRefundToken, $userId, $token
+                        ]);
+                        $db->execute("UPDATE user_balances SET available = available + ?, updated_at = NOW() WHERE user_id = ? AND token = ?", [
+                            $gasFee, $userId, 'SOL'
+                        ]);
+                    }
+
+                    $db->execute("UPDATE pending_transfers SET status = 'failed', failure_reason = ?, processed_at = NOW() WHERE id = ?", [
+                        $e->getMessage(), $transferId
+                    ]);
+                });
+            } catch (\Throwable $revertErr) {
+                error_log("Critical error reverting transfer #{$transferId}: " . $revertErr->getMessage());
+            }
 
             $failed++;
         }

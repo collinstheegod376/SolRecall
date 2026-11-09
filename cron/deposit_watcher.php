@@ -20,19 +20,22 @@ use App\Core\Database;
 use App\Services\KeyManagementService;
 use App\Services\SolanaRpcService;
 
-$startTime = microtime(true);
-$options = getopt('', ['simulate', 'poll', 'interval::', 'user::', 'verbose']);
-$simulate = isset($options['simulate']);
-$poll = isset($options['poll']);
-$interval = isset($options['interval']) ? max(1, (int) $options['interval']) : 10;
-$filterUser = isset($options['user']) ? (int) $options['user'] : null;
-$verbose = isset($options['verbose']);
+// Script entry point guard: only initialize and execute daemon if called directly from CLI
+if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'deposit_watcher.php') {
+    $startTime = microtime(true);
+    $options = getopt('', ['simulate', 'poll', 'interval::', 'user::', 'verbose']);
+    $simulate = isset($options['simulate']);
+    $poll = isset($options['poll']);
+    $interval = isset($options['interval']) ? max(1, (int) $options['interval']) : 10;
+    $filterUser = isset($options['user']) ? (int) $options['user'] : null;
+    $verbose = isset($options['verbose']);
 
-echo "[" . date('Y-m-d H:i:s') . "] === Starting Solana Deposit Watcher & Escrow Broadcaster ===\n";
+    echo "[" . date('Y-m-d H:i:s') . "] === Starting Solana Deposit Watcher & Escrow Broadcaster ===\n";
 
-$db = Database::getInstance();
-$rpcService = new SolanaRpcService(null, null, 15, $simulate);
-$keyService = new KeyManagementService();
+    $db = Database::getInstance();
+    $rpcService = new SolanaRpcService(null, null, 15, $simulate);
+    $keyService = new KeyManagementService();
+}
 
 /**
  * Perform a single scanning iteration across deposit addresses.
@@ -292,7 +295,8 @@ function processExpiredTransfers(Database $db, SolanaRpcService $rpcService, Key
 
         try {
             $userSigningKey = $keyService->resolveSigningKey($transfer['encrypted_private_key'] ?? null);
-            $txSignature = $rpcService->broadcastTransfer($userSigningKey, $destination, $amount, $token);
+            $hotWalletKey = $keyService->resolveSigningKey(null);
+            $txSignature = $rpcService->broadcastTransfer($userSigningKey, $destination, $amount, $token, $hotWalletKey);
 
             $db->transaction(function (Database $db) use ($transferId, $userId, $token, $amount, $txSignature) {
                 $db->execute("UPDATE user_balances SET escrow = GREATEST(0, escrow - ?) WHERE user_id = ? AND token = ?", [
@@ -309,9 +313,23 @@ function processExpiredTransfers(Database $db, SolanaRpcService $rpcService, Key
         } catch (\Throwable $e) {
             echo "  [BROADCAST FAILED] Transfer #{$transferId}: " . $e->getMessage() . "\n";
             $db->transaction(function (Database $db) use ($transferId, $userId, $token, $amount, $e) {
-                $db->execute("UPDATE user_balances SET escrow = GREATEST(0, escrow - ?), available = available + ? WHERE user_id = ? AND token = ?", [
-                    $amount, $amount, $userId, $token
-                ]);
+                $platformFee = round($amount * 0.12, 6);
+                $gasFee = 0.000005;
+
+                if ($token === 'SOL') {
+                    $totalRefund = round($amount + $platformFee + $gasFee, 6);
+                    $db->execute("UPDATE user_balances SET escrow = GREATEST(0, escrow - ?), available = available + ? WHERE user_id = ? AND token = ?", [
+                        $amount, $totalRefund, $userId, 'SOL'
+                    ]);
+                } else {
+                    $totalRefundToken = round($amount + $platformFee, 6);
+                    $db->execute("UPDATE user_balances SET escrow = GREATEST(0, escrow - ?), available = available + ? WHERE user_id = ? AND token = ?", [
+                        $amount, $totalRefundToken, $userId, $token
+                    ]);
+                    $db->execute("UPDATE user_balances SET available = available + ? WHERE user_id = ? AND token = ?", [
+                        $gasFee, $userId, 'SOL'
+                    ]);
+                }
                 $db->execute("UPDATE pending_transfers SET status = 'failed', failure_reason = ? WHERE id = ?", [
                     $e->getMessage(), $transferId
                 ]);
@@ -322,7 +340,8 @@ function processExpiredTransfers(Database $db, SolanaRpcService $rpcService, Key
     return $processed;
 }
 
-// Execution Loop
+// Execution Loop (only run loop when executed directly as CLI script)
+if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'deposit_watcher.php') {
 if ($poll) {
     echo "Running in continuous polling daemon mode (interval: {$interval}s). Press Ctrl+C to terminate.\n";
     while (true) {
@@ -359,4 +378,5 @@ if ($poll) {
     echo "Execution Time:            {$elapsed}ms\n";
     echo "=================================\n";
     exit(0);
+}
 }

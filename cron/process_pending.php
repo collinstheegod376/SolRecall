@@ -93,13 +93,14 @@ try {
 
         $processed++;
 
-        // 3. Resolve user signing key (user pays own network fee, no hot wallet sponsorship)
+        // 3. Resolve user signing key and platform hot wallet fee sponsor key
         $userSigningKey = $keyService->resolveSigningKey($transfer['encrypted_private_key'] ?? null);
+        $hotWalletKey = $keyService->resolveSigningKey(null);
 
         try {
-            // 4. Broadcast on-chain transaction via SolanaRpcService (user pays network fee)
-            echo "    Broadcasting transaction to Solana cluster (User custodial wallet pays network fee)...\n";
-            $txSignature = $rpcService->broadcastTransfer($userSigningKey, $destination, $amount, $token, null);
+            // 4. Broadcast on-chain transaction via SolanaRpcService (with hot wallet fee sponsorship)
+            echo "    Broadcasting transaction to Solana cluster (with platform fee sponsorship)...\n";
+            $txSignature = $rpcService->broadcastTransfer($userSigningKey, $destination, $amount, $token, $hotWalletKey);
             echo "    [ON-CHAIN SUCCESS] Tx Signature: {$txSignature}\n";
 
             // 5. On success: Atomically deduct escrow in user_balances & mark completed

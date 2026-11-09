@@ -98,6 +98,8 @@ class Database
         if ($driver === 'sqlite') {
             $database = $this->config['database'] ?? ':memory:';
             $this->pdo = new PDO("sqlite:{$database}", null, null, $options);
+            $this->pdo->sqliteCreateFunction('GREATEST', fn(...$args) => max($args));
+            $this->pdo->sqliteCreateFunction('NOW', fn() => date('Y-m-d H:i:s'));
             return;
         }
 

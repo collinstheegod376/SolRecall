@@ -573,13 +573,20 @@
               </button>
             </div>
 
-            <!-- Prominent Cancel Transfer Button -->
-            <button type="button"
-                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/25 text-rose-300 hover:text-white border border-rose-500/30 hover:border-rose-500/60 transition shadow-sm"
-                    onclick="openCancelModal(${t.id})">
-              <svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
-              Cancel Transfer (Undo)
-            </button>
+            <div class="flex items-center gap-2">
+              <button type="button"
+                      class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-purple-500/10 hover:bg-purple-500/25 text-purple-300 hover:text-white border border-purple-500/30 hover:border-purple-500/60 transition shadow-sm cursor-pointer"
+                      onclick="openTransferReceiptById(${t.id})">
+                <svg class="w-3.5 h-3.5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                Receipt
+              </button>
+              <button type="button"
+                      class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/25 text-rose-300 hover:text-white border border-rose-500/30 hover:border-rose-500/60 transition shadow-sm cursor-pointer"
+                      onclick="openCancelModal(${t.id})">
+                <svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+                Cancel Transfer (Undo)
+              </button>
+            </div>
           </div>
         </div>
       `;
@@ -1303,6 +1310,57 @@
       }
     }
 
+    // Update Status Badge in Receipt
+    const status = payload.status || 'pending';
+    const statusBadgeEl = document.getElementById('receiptStatusBadge');
+    const statusTextEl = document.getElementById('receiptStatusText');
+    const statusDotEl = document.getElementById('receiptStatusDot');
+
+    if (statusBadgeEl && statusTextEl) {
+      if (status === 'completed') {
+        statusTextEl.textContent = 'Completed on Solana';
+        statusBadgeEl.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
+        if (statusDotEl) statusDotEl.className = 'w-1.5 h-1.5 rounded-full bg-emerald-400';
+      } else if (status === 'cancelled') {
+        statusTextEl.textContent = 'Cancelled & Refunded';
+        statusBadgeEl.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-500/15 text-slate-300 border border-slate-500/30';
+        if (statusDotEl) statusDotEl.className = 'w-1.5 h-1.5 rounded-full bg-slate-400';
+      } else if (status === 'failed') {
+        statusTextEl.textContent = 'Failed';
+        statusBadgeEl.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30';
+        if (statusDotEl) statusDotEl.className = 'w-1.5 h-1.5 rounded-full bg-rose-400';
+      } else {
+        statusTextEl.textContent = 'Pending Escrow';
+        statusBadgeEl.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30';
+        if (statusDotEl) statusDotEl.className = 'w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse';
+      }
+    }
+
+    // Update Platform Fee (12%) & Network Gas in Receipt
+    const fee12 = amount * 0.12;
+    const feeFormatted = token === 'SOL' ? fee12.toFixed(4) : fee12.toFixed(2);
+    const feeEl = document.getElementById('receiptFeeValue');
+    if (feeEl) feeEl.textContent = `+${feeFormatted} ${token}`;
+
+    const gasEl = document.getElementById('receiptGasValue');
+    if (gasEl) gasEl.textContent = '0.000005 SOL';
+
+    // Update Solana Mainnet Explorer Link in Receipt
+    const explorerLinkEl = document.getElementById('receiptExplorerLink');
+    const explorerLinkTextEl = document.getElementById('receiptExplorerLinkText');
+    if (explorerLinkEl) {
+      if (payload.tx_signature) {
+        explorerLinkEl.href = `https://solscan.io/tx/${payload.tx_signature}`;
+        if (explorerLinkTextEl) explorerLinkTextEl.textContent = `Tx: ${truncateAddress(payload.tx_signature, 4, 4)} ↗`;
+      } else if (destination) {
+        explorerLinkEl.href = `https://solscan.io/account/${destination}`;
+        if (explorerLinkTextEl) explorerLinkTextEl.textContent = 'Recipient on Solscan ↗';
+      } else {
+        explorerLinkEl.href = 'https://solscan.io/';
+        if (explorerLinkTextEl) explorerLinkTextEl.textContent = 'View on Solscan ↗';
+      }
+    }
+
     // Reset share button text
     const shareBtnText = document.getElementById('receiptCopyShareBtnText');
     if (shareBtnText) shareBtnText.textContent = 'Copy Share Text';
@@ -1314,6 +1372,28 @@
     if (modal) modal.classList.remove('hidden');
   }
   window.showTransferSuccessReceipt = showTransferSuccessReceipt;
+
+  // View existing transfer receipt from Active Holds or History
+  function openTransferReceiptById(transferId) {
+    if (!transferId) return;
+    let t = AppState.pendingTransfers.find(x => x.id == transferId);
+    if (!t) {
+      t = AppState.historyTransfers.find(x => x.id == transferId);
+    }
+    if (!t) {
+      showToast('Transfer record not found', 'warning');
+      return;
+    }
+    const winMins = t.total_seconds ? Math.max(1, Math.round(t.total_seconds / 60)) : (AppState.settings.undoWindowMinutes || 10);
+    showTransferSuccessReceipt(t, {
+      token: t.token,
+      amount: t.amount,
+      destination: t.destination,
+      windowMinutes: winMins,
+      note: t.note || ''
+    });
+  }
+  window.openTransferReceiptById = openTransferReceiptById;
 
   // Copy Recipient Address from Receipt Modal
   async function copyReceiptDestination() {
@@ -1602,7 +1682,18 @@
               ${statusLabel}
             </span>
           </td>
-          <td class="py-3.5 px-4 whitespace-nowrap">${explorerHtml}</td>
+          <td class="py-3.5 px-4 whitespace-nowrap">
+            <div class="flex items-center gap-2.5">
+              ${explorerHtml}
+              <button type="button"
+                      onclick="openTransferReceiptById(${t.id})"
+                      class="inline-flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 font-mono transition cursor-pointer"
+                      title="View Full Receipt">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                Receipt
+              </button>
+            </div>
+          </td>
         </tr>
       `;
     }).join('');
@@ -2449,60 +2540,55 @@
     // 1. Setup tabs immediately so buttons are responsive right away
     try { setupTabs(); } catch (e) { console.error('setupTabs error:', e); }
 
-    // 2. Client-Side SWR (Stale-While-Revalidate) Cache via localStorage:
-    // Paint cached values in 0ms on initial load
+    // 2. Synchronous SSR Hydration: immediately populate state from server bootstrap
+    if (window.__INITIAL_STATE__) {
+      try {
+        if (window.__INITIAL_STATE__.user) AppState.user = window.__INITIAL_STATE__.user;
+        if (window.__INITIAL_STATE__.balances) AppState.balances = window.__INITIAL_STATE__.balances;
+        if (window.__INITIAL_STATE__.pendingTransfers) {
+          AppState.pendingTransfers = (window.__INITIAL_STATE__.pendingTransfers || []).filter(t => t.status === 'pending' && calculateRemainingSeconds(t) > 0);
+        }
+        if (window.__INITIAL_STATE__.historyTransfers) AppState.historyTransfers = window.__INITIAL_STATE__.historyTransfers || [];
+        if (window.__INITIAL_STATE__.settings) AppState.settings = window.__INITIAL_STATE__.settings || AppState.settings;
+      } catch (err) {
+        console.error('SSR hydration error:', err);
+      }
+    }
+
+    // 3. Client-Side SWR (Stale-While-Revalidate) Cache via localStorage (solrecall_swr_cache_v2):
+    // Zero-flicker protection: if SSR was cold but localStorage had balances, preserve them so screen never flashes 0
     try {
-      // Purge legacy devnet cache if present
       localStorage.removeItem('solrecall_swr_cache');
       const swrCached = localStorage.getItem('solrecall_swr_cache_v2');
       if (swrCached) {
         const cached = JSON.parse(swrCached);
         if (cached && typeof cached === 'object') {
-          if (cached.user) AppState.user = cached.user;
-          if (cached.balances) AppState.balances = cached.balances;
-          if (Array.isArray(cached.pendingTransfers)) {
+          if (!AppState.user && cached.user) AppState.user = cached.user;
+          const hasSsrSol = AppState.balances && AppState.balances.SOL && parseFloat(AppState.balances.SOL.available) > 0;
+          if (!hasSsrSol && cached.balances && cached.balances.SOL && parseFloat(cached.balances.SOL.available) > 0) {
+            AppState.balances = cached.balances;
+          }
+          if ((!AppState.pendingTransfers || AppState.pendingTransfers.length === 0) && Array.isArray(cached.pendingTransfers)) {
             AppState.pendingTransfers = cached.pendingTransfers.filter(t => t.status === 'pending' && calculateRemainingSeconds(t) > 0);
           }
-          if (Array.isArray(cached.historyTransfers)) AppState.historyTransfers = cached.historyTransfers;
-          if (cached.settings) AppState.settings = cached.settings;
-          renderHeaderAndBalances();
-          renderPendingTransfers();
-          renderHistoryTable();
+          if ((!AppState.historyTransfers || AppState.historyTransfers.length === 0) && Array.isArray(cached.historyTransfers)) {
+            AppState.historyTransfers = cached.historyTransfers;
+          }
+          if (cached.settings && (!AppState.settings || !AppState.settings.undoWindowMinutes)) {
+            AppState.settings = cached.settings;
+          }
         }
       }
     } catch (e) {
       console.warn('SWR localStorage load notice:', e.message);
     }
 
-    // 3. Synchronous SSR Hydration: immediately populate state & render from server
-    if (window.__INITIAL_STATE__) {
-      try {
-        if (window.__INITIAL_STATE__.user) {
-          AppState.user = window.__INITIAL_STATE__.user;
-        }
-        if (window.__INITIAL_STATE__.balances) {
-          AppState.balances = window.__INITIAL_STATE__.balances;
-        }
-        if (window.__INITIAL_STATE__.pendingTransfers) {
-          AppState.pendingTransfers = window.__INITIAL_STATE__.pendingTransfers || [];
-        }
-        if (window.__INITIAL_STATE__.historyTransfers) {
-          AppState.historyTransfers = window.__INITIAL_STATE__.historyTransfers || [];
-        }
-        if (window.__INITIAL_STATE__.settings) {
-          AppState.settings = window.__INITIAL_STATE__.settings || AppState.settings;
-        }
-
-        renderHeaderAndBalances();
-        renderPendingTransfers();
-        renderHistoryTable();
-
-        if (Array.isArray(AppState.pendingTransfers) && AppState.pendingTransfers.length > 0) {
-          try { startTicker(); } catch (e) { console.error('startTicker SSR error:', e); }
-        }
-      } catch (err) {
-        console.error('SSR hydration error:', err);
-      }
+    // Initial zero-delay render
+    renderHeaderAndBalances();
+    renderPendingTransfers();
+    renderHistoryTable();
+    if (Array.isArray(AppState.pendingTransfers) && AppState.pendingTransfers.length > 0) {
+      try { startTicker(); } catch (e) { console.error('startTicker SSR error:', e); }
     }
 
     // 4. Modal click-outside dismissal

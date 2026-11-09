@@ -25,7 +25,6 @@ return function (Router $router): void {
     $router->get('/api/auth/me', [AuthController::class, 'me']);
     $router->get('/api/auth/solana-nonce', [AuthController::class, 'getSolanaNonce']);
     $router->post('/api/auth/solana-verify', [AuthController::class, 'verifySolanaAuth']);
-    $router->post('/api/auth/google', [AuthController::class, 'googleAuth']);
 
     // Two-Factor Authentication (2FA) Dedicated Endpoints
     $router->post('/api/auth/2fa/setup', [AuthController::class, 'setup2FA']);

@@ -23,17 +23,18 @@ BEGIN
 END $$;
 
 -- 3. Schedule the SolRecall Escrow & Deposit Processor to run EVERY MINUTE (* * * * *)
--- NOTE: Replace 'https://YOUR_VERCEL_DOMAIN.vercel.app' with your deployed Vercel domain or custom domain.
--- If you configured CRON_SECRET in your Vercel Environment Variables, append ?secret=YOUR_CRON_SECRET
+-- Authenticates with CRON_SECRET via both Authorization Bearer header and ?secret= query param
+-- to guarantee 100% authorization across all Vercel edge/serverless proxies.
 SELECT cron.schedule(
     'solrecall-escrow-timer',
     '* * * * *', -- Runs every 60 seconds natively inside Supabase
     $$
     SELECT net.http_get(
-        url := 'https://collinstheegod376.vercel.app/api/cron',
+        url := 'https://collinstheegod376.vercel.app/api/cron?secret=7cc41736a91fb48ef414e7453c151b14cc03c829230842e7f68624ae0996636b',
         headers := jsonb_build_object(
             'Content-Type', 'application/json',
-            'User-Agent', 'Supabase-pg_cron/SolRecall'
+            'User-Agent', 'Supabase-pg_cron/SolRecall',
+            'Authorization', 'Bearer 7cc41736a91fb48ef414e7453c151b14cc03c829230842e7f68624ae0996636b'
         )
     );
     $$
