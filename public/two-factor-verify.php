@@ -29,12 +29,22 @@ if (empty($_SESSION['pending_2fa_user_id'])) {
 }
 ?>
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" class="dark overflow-x-hidden">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Two-Factor Verification • SolRecall</title>
-  <link rel="icon" type="image/png" href="/assets/img/logo.png">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/img/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#000000">
+<!-- Google Fonts: 7 Distinct Hierarchy Tiers -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cinzel:wght@600;700&family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600&family=Rajdhani:wght@600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -43,17 +53,34 @@ if (empty($_SESSION['pending_2fa_user_id'])) {
       theme: {
         extend: {
           fontFamily: {
-            sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
-            mono: ['"JetBrains Mono"', '"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
-            display: ['"Space Grotesk"', 'Inter', 'sans-serif']
+            display: ['"Syne"', 'sans-serif'],
+            body: ['"Plus Jakarta Sans"', 'sans-serif'],
+            stats: ['"Bebas Neue"', 'sans-serif'],
+            crypto: ['"JetBrains Mono"', 'monospace'],
+            nav: ['"Rajdhani"', 'sans-serif'],
+            cta: ['"Outfit"', 'sans-serif'],
+            timelock: ['"Cinzel"', 'serif'],
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace']
           },
           colors: {
+            pitch: '#000000',
+            obsidian: {
+              DEFAULT: '#08080a',
+              light: '#0f0f13',
+              card: '#141418'
+            },
+            hairline: {
+              DEFAULT: '#222228',
+              light: '#2a2a34'
+            },
+            stealth: '#94949e',
             solana: {
               purple: '#9945FF',
               green: '#14F195',
-              dark: '#07090e',
-              card: '#0e1424',
-              border: '#1e293b'
+              dark: '#000000',
+              card: '#141418',
+              border: '#222228'
             }
           }
         }
@@ -61,22 +88,16 @@ if (empty($_SESSION['pending_2fa_user_id'])) {
     }
   </script>
   <!-- Custom Styles -->
-  <link rel="stylesheet" href="/assets/css/style.css?v=<?= file_exists(__DIR__ . '/assets/css/style.css') ? filemtime(__DIR__ . '/assets/css/style.css') : '1.2' ?>">
+  <link rel="stylesheet" href="/assets/css/style.css?v=<?= file_exists(__DIR__ . '/assets/css/style.css') ? filemtime(__DIR__ . '/assets/css/style.css') : '2.0' ?>">
   <style>
     .otp-input:focus {
-      border-color: #9945FF;
-      box-shadow: 0 0 15px rgba(153, 69, 255, 0.35);
+      border-color: #ffffff;
+      box-shadow: 0 0 0 1px #ffffff;
       outline: none;
     }
   </style>
 </head>
-<body class="min-h-screen bg-[#07090e] text-slate-100 flex flex-col justify-between selection:bg-purple-500 selection:text-white">
-
-  <!-- Background decorative glows -->
-  <div class="fixed inset-0 overflow-hidden pointer-events-none z-0">
-    <div class="absolute -top-40 -left-40 w-96 h-96 bg-purple-600/15 rounded-full blur-[120px]"></div>
-    <div class="absolute -bottom-40 -right-40 w-96 h-96 bg-emerald-500/10 rounded-full blur-[120px]"></div>
-  </div>
+<body class="min-h-screen bg-[#000000] text-zinc-100 flex flex-col justify-between selection:bg-zinc-800 selection:text-white font-body">
 
   <!-- Main Container -->
   <div class="relative z-10 flex-1 flex flex-col items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
@@ -85,33 +106,29 @@ if (empty($_SESSION['pending_2fa_user_id'])) {
       <!-- Brand Header -->
       <div class="text-center">
         <a href="/" class="inline-flex items-center justify-center gap-3 group">
-          <img src="/logo.jpg" alt="SolRecall Logo" class="w-14 h-14 rounded-2xl shadow-xl shadow-purple-500/20 border border-purple-500/30 group-hover:scale-105 transition-transform duration-200">
+          <img src="/assets/img/logo.png" alt="SolRecall Logo" class="w-14 h-14 rounded-2xl border border-[#222228] shadow-2xl group-hover:scale-105 transition-transform duration-200 object-cover">
         </a>
       </div>
 
       <!-- Auth Card -->
-      <div class="glass-panel rounded-3xl p-8 border border-white/10 shadow-2xl shadow-black/50 relative">
+      <div class="glass-panel rounded-3xl p-8 border border-[#222228] shadow-2xl relative bg-[#141418]/85 backdrop-blur-xl">
 
         <!-- Shield Icon Header -->
         <div class="text-center space-y-3 mb-6">
-          <div class="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-tr from-purple-600/20 to-emerald-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400 shadow-xl shadow-purple-500/10">
-            <svg class="w-8 h-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-            </svg>
+          <div class="mx-auto w-16 h-16 rounded-2xl bg-[#08080a] border border-[#222228] flex items-center justify-center text-white shadow-xl">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
           </div>
-          <h1 class="text-2xl font-extrabold tracking-tight text-white font-sans">
+          <h1 class="text-2xl font-extrabold tracking-tight text-white font-display">
             Two-Factor Verification
           </h1>
-          <p class="text-xs text-slate-400 leading-relaxed max-w-sm mx-auto">
+          <p class="text-xs text-[#94949e] leading-relaxed max-w-sm mx-auto font-body">
             Enter the 6-digit authentication code from Google Authenticator, Authy, or your TOTP app to access your account.
           </p>
         </div>
 
         <!-- Inline Error Banner -->
-        <div id="errorBanner" class="hidden mb-5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
-          <svg class="w-4 h-4 shrink-0 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-          </svg>
+        <div id="errorBanner" class="hidden mb-5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2 font-body">
+          <svg class="w-4 h-4 shrink-0 text-rose-400" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           <span id="errorMessage" class="flex-1 font-medium">Invalid or expired authentication code</span>
         </div>
 
@@ -120,16 +137,16 @@ if (empty($_SESSION['pending_2fa_user_id'])) {
 
           <!-- 6-Digit OTP Segmented Input Boxes -->
           <div>
-            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 text-center mb-3">
+            <label class="block text-xs font-bold uppercase tracking-wider text-[#94949e] text-center mb-3 font-nav">
               Authentication Code
             </label>
             <div class="flex justify-between items-center gap-2 sm:gap-2.5 max-w-xs mx-auto" id="otpBoxContainer">
-              <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" data-index="0" class="otp-input w-11 h-13 sm:w-12 sm:h-14 text-center text-xl sm:text-2xl font-mono font-bold rounded-xl bg-slate-900/90 border border-white/10 text-white transition selection:bg-transparent" autofocus>
-              <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" data-index="1" class="otp-input w-11 h-13 sm:w-12 sm:h-14 text-center text-xl sm:text-2xl font-mono font-bold rounded-xl bg-slate-900/90 border border-white/10 text-white transition selection:bg-transparent">
-              <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" data-index="2" class="otp-input w-11 h-13 sm:w-12 sm:h-14 text-center text-xl sm:text-2xl font-mono font-bold rounded-xl bg-slate-900/90 border border-white/10 text-white transition selection:bg-transparent">
-              <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" data-index="3" class="otp-input w-11 h-13 sm:w-12 sm:h-14 text-center text-xl sm:text-2xl font-mono font-bold rounded-xl bg-slate-900/90 border border-white/10 text-white transition selection:bg-transparent">
-              <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" data-index="4" class="otp-input w-11 h-13 sm:w-12 sm:h-14 text-center text-xl sm:text-2xl font-mono font-bold rounded-xl bg-slate-900/90 border border-white/10 text-white transition selection:bg-transparent">
-              <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" data-index="5" class="otp-input w-11 h-13 sm:w-12 sm:h-14 text-center text-xl sm:text-2xl font-mono font-bold rounded-xl bg-slate-900/90 border border-white/10 text-white transition selection:bg-transparent">
+              <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" data-index="0" class="otp-input w-11 h-13 sm:w-12 sm:h-14 text-center text-xl sm:text-2xl font-crypto font-bold rounded-xl bg-[#08080a] border border-[#222228] text-white transition selection:bg-transparent" autofocus>
+              <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" data-index="1" class="otp-input w-11 h-13 sm:w-12 sm:h-14 text-center text-xl sm:text-2xl font-crypto font-bold rounded-xl bg-[#08080a] border border-[#222228] text-white transition selection:bg-transparent">
+              <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" data-index="2" class="otp-input w-11 h-13 sm:w-12 sm:h-14 text-center text-xl sm:text-2xl font-crypto font-bold rounded-xl bg-[#08080a] border border-[#222228] text-white transition selection:bg-transparent">
+              <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" data-index="3" class="otp-input w-11 h-13 sm:w-12 sm:h-14 text-center text-xl sm:text-2xl font-crypto font-bold rounded-xl bg-[#08080a] border border-[#222228] text-white transition selection:bg-transparent">
+              <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" data-index="4" class="otp-input w-11 h-13 sm:w-12 sm:h-14 text-center text-xl sm:text-2xl font-crypto font-bold rounded-xl bg-[#08080a] border border-[#222228] text-white transition selection:bg-transparent">
+              <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" data-index="5" class="otp-input w-11 h-13 sm:w-12 sm:h-14 text-center text-xl sm:text-2xl font-crypto font-bold rounded-xl bg-[#08080a] border border-[#222228] text-white transition selection:bg-transparent">
             </div>
             <!-- Hidden Single Input For Fallback / Keystroke Sync -->
             <input type="hidden" id="fullOtpCode" name="code" value="">
@@ -138,16 +155,16 @@ if (empty($_SESSION['pending_2fa_user_id'])) {
           <!-- Submit Button -->
           <button type="submit"
                   id="verifyBtn"
-                  class="w-full py-3 px-4 rounded-xl font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 border border-purple-400/30 shadow-lg shadow-purple-600/20 transition-all duration-200 flex items-center justify-center gap-2 text-sm">
-            <span id="verifySpinner" class="hidden spinner-sm"></span>
+                  class="w-full py-3 px-4 rounded-xl font-bold text-black bg-white hover:bg-zinc-200 border border-white transition-all duration-200 flex items-center justify-center gap-2 text-sm font-cta cursor-pointer shadow-lg shadow-white/5 active:scale-95">
+            <span id="verifySpinner" class="hidden spinner-sm !border-t-black !border-black/20"></span>
             <span id="verifyBtnText">Verify & Access Dashboard</span>
           </button>
 
           <!-- Return to Sign In Option -->
           <div class="text-center pt-2">
             <a href="/two-factor-verify?action=cancel"
-               class="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition group">
-              <svg class="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               class="inline-flex items-center gap-1.5 text-xs text-[#94949e] hover:text-white transition group font-body">
+              <svg class="w-3.5 h-3.5 text-[#71717a] group-hover:text-white transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
               </svg>
               <span>Return to Sign In</span>
@@ -159,8 +176,8 @@ if (empty($_SESSION['pending_2fa_user_id'])) {
       </div>
 
       <!-- Security Notice -->
-      <p class="text-center text-[11px] text-slate-500">
-        Protected by hardware-grade RFC 6238 TOTP authentication. Codes expire every 30 seconds.
+      <p class="text-center text-[11px] text-[#71717a] font-nav tracking-wider">
+        RFC 6238 TOTP AUTHENTICATION &bull; CODES EXPIRE EVERY 30 SECONDS
       </p>
 
     </div>

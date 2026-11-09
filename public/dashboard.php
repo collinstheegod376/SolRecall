@@ -108,41 +108,64 @@ $ssrActiveUsdtEscrow = max($ssrUsdtEscrow, $ssrPendingUsdt);
 $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
 ?>
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" class="dark overflow-x-hidden">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SolRecall - Reversible Time-Locked Escrow on Solana</title>
-  <link rel="icon" type="image/png" href="/assets/img/logo.png">
-  <link rel="apple-touch-icon" href="/assets/img/logo.png">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/img/apple-touch-icon.png">
   <!-- PWA & Mobile Meta Tags -->
   <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#07090e">
+  <meta name="theme-color" content="#000000">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="SolRecall">
   <!-- Client-side QRCode Generator (Offline / Ad-blocker proof) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- Google Fonts: 7 Distinct Hierarchy Tiers -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cinzel:wght@600;700&family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600&family=Rajdhani:wght@600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
+    <script>
     tailwind.config = {
       darkMode: 'class',
       theme: {
         extend: {
           fontFamily: {
-            sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
-            mono: ['"JetBrains Mono"', '"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
-            display: ['"Space Grotesk"', 'Inter', 'sans-serif']
+            display: ['"Syne"', 'sans-serif'],
+            body: ['"Plus Jakarta Sans"', 'sans-serif'],
+            stats: ['"Bebas Neue"', 'sans-serif'],
+            crypto: ['"JetBrains Mono"', 'monospace'],
+            nav: ['"Rajdhani"', 'sans-serif'],
+            cta: ['"Outfit"', 'sans-serif'],
+            timelock: ['"Cinzel"', 'serif'],
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace']
           },
           colors: {
+            pitch: '#000000',
+            obsidian: {
+              DEFAULT: '#08080a',
+              light: '#0f0f13',
+              card: '#141418'
+            },
+            hairline: {
+              DEFAULT: '#222228',
+              light: '#2a2a34'
+            },
+            stealth: '#94949e',
             solana: {
               purple: '#9945FF',
               green: '#14F195',
-              dark: '#07090e',
-              card: '#0e1424',
-              border: '#1e293b'
+              dark: '#000000',
+              card: '#141418',
+              border: '#222228'
             }
           }
         }
@@ -152,19 +175,14 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
   <!-- Custom Styles -->
   <link rel="stylesheet" href="/assets/css/style.css?v=<?= file_exists(__DIR__ . '/assets/css/style.css') ? filemtime(__DIR__ . '/assets/css/style.css') : '1.1' ?>">
 </head>
-<body class="min-h-screen bg-[#07090e] text-slate-100 flex flex-col justify-between selection:bg-purple-500 selection:text-white pb-28 sm:pb-32 md:pb-8">
+<body class="min-h-screen bg-[#000000] text-zinc-100 flex flex-col justify-between selection:bg-zinc-800 selection:text-white pb-28 sm:pb-32 md:pb-8 overflow-x-hidden w-full font-body">
 
-  <!-- Background subtle glows (non-blinking) -->
-  <div class="fixed inset-0 overflow-hidden pointer-events-none z-0">
-    <div class="absolute -top-40 -left-40 w-[32rem] h-[32rem] bg-purple-600/10 rounded-full blur-[140px]"></div>
-    <div class="absolute top-1/3 -right-40 w-[28rem] h-[28rem] bg-emerald-500/10 rounded-full blur-[140px]"></div>
-    <div class="absolute -bottom-40 left-1/3 w-[30rem] h-[30rem] bg-amber-500/5 rounded-full blur-[150px]"></div>
-  </div>
+  <!-- Ambient Pure Obsidian Space (Purged AI Radial Blobs) -->
 
   <div class="relative z-10 flex-1 flex flex-col">
 
     <!-- Top Navigation Bar -->
-    <header class="border-b border-white/10 bg-[#090d16]/90 backdrop-blur-md sticky top-0 z-30">
+    <header class="border-b border-[#222228] bg-[#08080a]/90 backdrop-blur-md sticky top-0 z-30">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
 
         <!-- Left: Logo & Project Brand -->
@@ -181,18 +199,18 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
 
         <!-- Center: Desktop Tab Navigation -->
         <nav class="hidden md:flex items-center space-x-1">
-          <button type="button" data-tab-target="overview" onclick="switchTab('overview')" class="px-3.5 py-1.5 text-xs font-semibold rounded-lg transition nav-tab-active cursor-pointer">
+          <button type="button" data-tab-target="overview" onclick="switchTab('overview')" class="px-3.5 py-1.5 text-xs font-bold rounded-lg transition nav-tab-active cursor-pointer font-nav tracking-wider">
             Dashboard
           </button>
-          <button type="button" data-tab-target="history" onclick="switchTab('history')" class="px-3.5 py-1.5 text-xs font-semibold rounded-lg transition nav-tab-inactive cursor-pointer">
+          <button type="button" data-tab-target="history" onclick="switchTab('history')" class="px-3.5 py-1.5 text-xs font-bold rounded-lg transition nav-tab-inactive cursor-pointer font-nav tracking-wider">
             History
           </button>
-          <button type="button" data-tab-target="settings" onclick="switchTab('settings')" class="px-3.5 py-1.5 text-xs font-semibold rounded-lg transition nav-tab-inactive cursor-pointer">
+          <button type="button" data-tab-target="settings" onclick="switchTab('settings')" class="px-3.5 py-1.5 text-xs font-bold rounded-lg transition nav-tab-inactive cursor-pointer font-nav tracking-wider">
             Settings & 2FA
           </button>
           <?php if ($isAdmin): ?>
-          <button type="button" data-tab-target="admin" onclick="switchTab('admin')" class="px-3.5 py-1.5 text-xs font-semibold rounded-lg transition nav-tab-inactive flex items-center gap-1.5 text-amber-400 cursor-pointer">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          <button type="button" data-tab-target="admin" onclick="switchTab('admin')" class="px-3.5 py-1.5 text-xs font-bold rounded-lg transition nav-tab-inactive flex items-center gap-1.5 text-amber-400 cursor-pointer font-nav tracking-wider">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
             Admin Ops
           </button>
           <?php endif; ?>
@@ -204,13 +222,11 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
           <!-- Deposit Address Pill -->
           <button type="button"
                   onclick="openDepositModal()"
-                  class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-white/10 text-xs text-slate-200 transition group shadow-sm"
+                  class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#141418] hover:bg-[#1a1a20] border border-[#222228] hover:border-[#2a2a34] text-xs text-zinc-200 transition group shadow-sm cursor-pointer"
                   title="Click to view Deposit QR Code">
             <span class="text-slate-400 text-[11px] uppercase font-semibold hidden sm:inline">Deposit:</span>
             <span id="userDepositAddress" class="font-mono text-purple-300 font-medium" data-full="<?= $depositAddress ?>"><?= !empty($depositAddress) ? (strlen($depositAddress) > 12 ? substr($depositAddress, 0, 4) . '...' . substr($depositAddress, -4) : $depositAddress) : 'Deposit' ?></span>
-            <svg class="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"/>
-            </svg>
+            <svg class="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
           </button>
 
           <!-- Desktop User Menu -->
@@ -219,22 +235,19 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
               <?= strtoupper(substr($username, 0, 2)) ?>
             </div>
             <a href="/api/auth/logout" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition" title="Sign Out">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
             </a>
           </div>
 
-          <!-- Mobile Hamburger Toggle Button (Top-Right) -->
+          <!-- Mobile Hamburger Toggle Button (#btnMobileMenu) with 3 Clean Morphing Lines -->
           <button type="button"
-                  id="mobileHamburgerBtn"
-                  onclick="toggleMobileMenu()"
-                  class="md:hidden p-2 rounded-xl text-slate-300 hover:text-white bg-slate-800/80 border border-white/10 transition"
-                  aria-label="Toggle Navigation">
-            <svg id="hamburgerOpenIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-            </svg>
-            <svg id="hamburgerCloseIcon" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
+                  id="btnMobileMenu"
+                  class="hamburger-btn md:hidden"
+                  aria-label="Toggle Mobile Navigation Drawer"
+                  aria-expanded="false">
+            <span class="hamburger-line line-top"></span>
+            <span class="hamburger-line line-mid"></span>
+            <span class="hamburger-line line-bot"></span>
           </button>
 
         </div>
@@ -244,20 +257,20 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
       <!-- Mobile Dropdown Menu under Header -->
       <div id="mobileDropdownMenu" class="hidden md:hidden border-t border-white/10 bg-[#090d16]/98 backdrop-blur-xl px-4 py-3 space-y-1 shadow-2xl">
         <button type="button" onclick="switchTab('overview'); toggleMobileMenu(false);" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-200 hover:bg-white/5 transition text-left">
-          <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+          <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
           Dashboard
         </button>
         <button type="button" onclick="switchTab('history'); toggleMobileMenu(false);" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-200 hover:bg-white/5 transition text-left">
-          <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           History & Ledger
         </button>
         <button type="button" onclick="switchTab('settings'); toggleMobileMenu(false);" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-200 hover:bg-white/5 transition text-left">
-          <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
           Settings & 2FA
         </button>
         <?php if ($isAdmin): ?>
         <button type="button" onclick="switchTab('admin'); toggleMobileMenu(false);" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-amber-400 hover:bg-white/5 transition text-left">
-          <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
           Admin Ops
         </button>
         <?php endif; ?>
@@ -302,13 +315,13 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
             <div class="space-y-1.5 mt-2">
               <div class="flex items-baseline justify-between">
                 <span class="text-xs text-slate-400">Available:</span>
-                <span id="bal-avail-sol" class="text-xl font-extrabold text-white font-mono"><?= number_format($ssrSolAvail, 4, '.', '') ?></span>
+                <span id="bal-avail-sol" class="text-2xl font-bold text-white font-stats tracking-wider"><?= number_format($ssrSolAvail, 4, '.', '') ?></span>
               </div>
               <div class="flex items-baseline justify-between text-xs pt-1 border-t border-white/5">
                 <span class="text-amber-400/90 flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> In Escrow:
                 </span>
-                <span id="bal-escrow-sol" class="font-mono text-amber-300 font-medium"><?= number_format($ssrSolEscrow, 4, '.', '') ?></span>
+                <span id="bal-escrow-sol" class="font-crypto text-amber-300 font-semibold"><?= number_format($ssrSolEscrow, 4, '.', '') ?></span>
               </div>
             </div>
           </div>
@@ -331,13 +344,13 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
             <div class="space-y-1.5 mt-2">
               <div class="flex items-baseline justify-between">
                 <span class="text-xs text-slate-400">Available:</span>
-                <span id="bal-avail-usdc" class="text-xl font-extrabold text-white font-mono"><?= number_format($ssrUsdcAvail, 2, '.', '') ?></span>
+                <span id="bal-avail-usdc" class="text-2xl font-bold text-white font-stats tracking-wider"><?= number_format($ssrUsdcAvail, 2, '.', '') ?></span>
               </div>
               <div class="flex items-baseline justify-between text-xs pt-1 border-t border-white/5">
                 <span class="text-amber-400/90 flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> In Escrow:
                 </span>
-                <span id="bal-escrow-usdc" class="font-mono text-amber-300 font-medium"><?= number_format($ssrUsdcEscrow, 2, '.', '') ?></span>
+                <span id="bal-escrow-usdc" class="font-crypto text-amber-300 font-semibold"><?= number_format($ssrUsdcEscrow, 2, '.', '') ?></span>
               </div>
             </div>
           </div>
@@ -360,13 +373,13 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
             <div class="space-y-1.5 mt-2">
               <div class="flex items-baseline justify-between">
                 <span class="text-xs text-slate-400">Available:</span>
-                <span id="bal-avail-usdt" class="text-xl font-extrabold text-white font-mono"><?= number_format($ssrUsdtAvail, 2, '.', '') ?></span>
+                <span id="bal-avail-usdt" class="text-2xl font-bold text-white font-stats tracking-wider"><?= number_format($ssrUsdtAvail, 2, '.', '') ?></span>
               </div>
               <div class="flex items-baseline justify-between text-xs pt-1 border-t border-white/5">
                 <span class="text-amber-400/90 flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> In Escrow:
                 </span>
-                <span id="bal-escrow-usdt" class="font-mono text-amber-300 font-medium"><?= number_format($ssrUsdtEscrow, 2, '.', '') ?></span>
+                <span id="bal-escrow-usdt" class="font-crypto text-amber-300 font-semibold"><?= number_format($ssrUsdtEscrow, 2, '.', '') ?></span>
               </div>
             </div>
           </div>
@@ -375,7 +388,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
           <div class="glass-panel rounded-2xl p-5 relative overflow-hidden border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-transparent to-purple-600/10">
             <div class="flex items-center justify-between mb-2">
               <span class="text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5 font-sans">
-                <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
                 Escrow Protected
               </span>
               <span id="pendingTransfersCount" class="<?= $ssrActivePendingCount > 0 ? 'inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold leading-none text-amber-300 bg-amber-500/20 border border-amber-500/40 rounded-full' : 'hidden' ?>"><?= $ssrActivePendingCount ?></span>
@@ -439,7 +452,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
             <!-- Empty State for Pending Transfers -->
             <div id="pendingTransfersEmpty" class="glass-panel rounded-2xl p-8 text-center border-dashed border-white/10">
               <div class="w-14 h-14 mx-auto rounded-2xl bg-slate-800/80 border border-white/5 flex items-center justify-center text-slate-400 mb-3 shadow-inner">
-                <svg class="w-7 h-7 text-purple-400/80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                <svg class="w-7 h-7 text-purple-400/80" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
               </div>
               <h4 class="text-sm font-bold text-white mb-1">No Active Escrow Holds</h4>
               <p class="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
@@ -458,7 +471,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
                   <p class="text-xs text-slate-400">Small amounts qualify for undo window</p>
                 </div>
                 <div class="w-7 h-7 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
                 </div>
               </div>
 
@@ -622,7 +635,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
                      id="historySearchInput"
                      placeholder="Search destination or signature..."
                      class="px-3.5 py-1.5 pl-8 rounded-xl bg-slate-900 border border-white/10 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-purple-500 w-56 sm:w-64">
-              <svg class="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <svg class="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             </div>
 
             <!-- Filter Badges -->
@@ -635,9 +648,10 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
           </div>
         </div>
 
-        <!-- History Table Card -->
+        <!-- History Table Card with Dual Desktop Table & Sleek Mobile Cards -->
         <div class="glass-panel rounded-2xl border border-white/10 overflow-hidden shadow-xl">
-          <div class="overflow-x-auto">
+          <!-- Desktop View: Full Responsive Table (Hidden on Mobile) -->
+          <div class="hidden md:block overflow-x-auto">
             <table class="w-full text-left border-collapse">
               <thead>
                 <tr class="border-b border-white/10 bg-slate-900/60 text-[11px] font-bold uppercase tracking-wider text-slate-400">
@@ -653,6 +667,11 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
                 <!-- Rendered by dashboard.js with official token logos -->
               </tbody>
             </table>
+          </div>
+
+          <!-- Mobile View: High-Conviction Compact Cards (Hidden on Desktop) -->
+          <div id="historyMobileList" class="md:hidden space-y-3 p-3.5">
+            <!-- Rendered dynamically by dashboard.js for mobile screens -->
           </div>
 
           <!-- Empty Row -->
@@ -679,7 +698,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
           <div class="glass-panel rounded-3xl p-6 border border-white/10 space-y-5">
             <div class="flex items-center gap-3">
               <div class="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
               </div>
               <div>
                 <h3 class="text-sm font-bold text-white">Undo Window Duration</h3>
@@ -747,7 +766,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
                   <div class="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                   </div>
                   <div>
                     <h3 class="text-sm font-bold text-white">Two-Factor Authentication (2FA)</h3>
@@ -769,7 +788,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
                         id="btnDelete2Fa"
                         onclick="openDelete2FaModal()"
                         class="<?= empty($_SESSION['two_factor_enabled']) ? 'hidden ' : '' ?>py-2 px-3 rounded-xl border border-rose-500/40 text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/60 text-xs font-medium transition flex items-center justify-center gap-1.5 cursor-pointer">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                   Delete / Reset 2FA Key
                 </button>
               </div>
@@ -779,7 +798,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
             <div class="glass-panel rounded-3xl p-6 border border-rose-500/30 bg-rose-500/[0.03] space-y-4">
               <div class="flex items-center gap-3">
                 <div class="w-9 h-9 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
                 </div>
                 <div>
                   <h3 class="text-sm font-bold text-white">Export Custodial Private Key</h3>
@@ -822,18 +841,14 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
                     onclick="adminTriggerCron()"
                     class="px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 border border-emerald-400/30 shadow-lg shadow-emerald-600/20 transition flex items-center gap-1.5 cursor-pointer active:scale-95">
               <span id="adminCronSpinner" class="hidden spinner-sm"></span>
-              <svg id="adminCronIcon" class="w-3.5 h-3.5 text-emerald-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-              </svg>
+              <svg id="adminCronIcon" class="w-3.5 h-3.5 text-emerald-200" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
               <span>Run Broadcaster & Sync</span>
             </button>
 
             <button type="button"
                     onclick="loadAdminData(true)"
                     class="px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700/80 border border-white/10 transition flex items-center gap-1.5 cursor-pointer">
-              <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-              </svg>
+              <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
               <span>Refresh</span>
             </button>
           </div>
@@ -908,14 +923,12 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
 
         <!-- Dev & Platform Fee Vault Control Center -->
         <div class="glass-panel rounded-3xl border border-purple-500/30 p-6 bg-gradient-to-br from-purple-900/20 via-slate-900/60 to-black/80 shadow-2xl relative overflow-hidden">
-          <div class="absolute -right-16 -top-16 w-56 h-56 bg-purple-600/10 rounded-full blur-3xl pointer-events-none"></div>
+          
 
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-white/10">
             <div class="flex items-center gap-3.5">
               <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600/30 to-indigo-600/30 border border-purple-500/40 flex items-center justify-center text-purple-300 shadow-lg shadow-purple-500/20">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
+                <svg class="w-6 h-6 text-purple-300" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></svg>
               </div>
               <div>
                 <div class="flex items-center gap-2">
@@ -933,13 +946,13 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
               <button type="button"
                       onclick="openExportDevKeyModal()"
                       class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-purple-500/30 hover:border-purple-500/60 text-xs font-semibold text-purple-300 hover:text-white transition shadow-sm flex items-center gap-1.5 cursor-pointer">
-                <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
                 Export Private Key
               </button>
               <button type="button"
                       onclick="openTransferDevFeesModal()"
                       class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-xs font-semibold text-white shadow-lg shadow-purple-600/30 transition flex items-center gap-1.5 cursor-pointer">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
                 Transfer Fees Out
               </button>
             </div>
@@ -953,7 +966,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
               <div class="flex items-center justify-between gap-2 mt-1">
                 <span id="devWalletAddressShort" class="font-mono text-xs font-bold text-purple-300 truncate">Loading...</span>
                 <button type="button" onclick="copyDevWalletAddress()" class="p-1 text-slate-400 hover:text-white transition cursor-pointer" title="Copy Address">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+                  <svg class="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
                 </button>
               </div>
               <a id="devWalletExplorerLink" href="#" target="_blank" rel="noopener" class="inline-block mt-2 text-[11px] text-purple-400 hover:text-purple-300 hover:underline">
@@ -1057,9 +1070,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
           <!-- Empty state for admin table -->
           <div id="adminTransfersEmpty" class="hidden py-8 text-center">
             <div class="w-10 h-10 mx-auto rounded-xl bg-slate-800/80 flex items-center justify-center text-slate-400 mb-2">
-              <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-              </svg>
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
             </div>
             <p class="text-xs font-bold text-slate-300">No Active Escrow Holds System-Wide</p>
             <p class="text-[11px] text-slate-500 mt-0.5">All user transfers have settled or been refunded.</p>
@@ -1127,22 +1138,22 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
   </div>
 
   <!-- Mobile Bottom Navigation Bar (fixed on mobile with ample clearance) -->
-  <nav class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[#090d16]/95 backdrop-blur-lg border-t border-white/10 px-4 py-2.5 flex items-center justify-around shadow-2xl">
-    <button type="button" data-mobile-tab="overview" onclick="switchTab('overview')" class="flex flex-col items-center gap-1 text-purple-400 py-1 px-3 rounded-xl">
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+  <nav class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[#08080a]/95 backdrop-blur-lg border-t border-[#222228] px-4 py-2.5 flex items-center justify-around shadow-2xl font-nav">
+    <button type="button" data-mobile-tab="overview" onclick="switchTab('overview')" class="touch-target flex flex-col items-center justify-center gap-1 text-purple-400 py-1 px-3 rounded-xl min-h-[48px]">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
       <span class="text-[10px] font-semibold">Overview</span>
     </button>
     <button type="button" data-mobile-tab="history" onclick="switchTab('history')" class="flex flex-col items-center gap-1 text-slate-400 py-1 px-3 rounded-xl">
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
       <span class="text-[10px] font-semibold">History</span>
     </button>
-    <button type="button" data-mobile-tab="settings" onclick="switchTab('settings')" class="flex flex-col items-center gap-1 text-slate-400 py-1 px-3 rounded-xl">
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+    <button type="button" data-mobile-tab="settings" onclick="switchTab('settings')" class="touch-target flex flex-col items-center justify-center gap-1 text-slate-400 py-1 px-3 rounded-xl min-h-[48px]">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
       <span class="text-[10px] font-semibold">Settings</span>
     </button>
     <?php if ($isAdmin): ?>
-    <button type="button" data-mobile-tab="admin" onclick="switchTab('admin')" class="flex flex-col items-center gap-1 text-slate-400 py-1 px-3 rounded-xl">
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+    <button type="button" data-mobile-tab="admin" onclick="switchTab('admin')" class="touch-target flex flex-col items-center justify-center gap-1 text-slate-400 py-1 px-3 rounded-xl min-h-[48px]">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
       <span class="text-[10px] font-semibold">Admin</span>
     </button>
     <?php endif; ?>
@@ -1154,10 +1165,10 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
 
   <!-- 1. Cancel Transfer Confirmation Modal -->
   <div id="cancelModal" class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
-    <div class="glass-panel rounded-3xl max-w-md w-full p-6 border border-white/10 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+    <div class="glass-panel modal-panel rounded-3xl max-w-md w-full p-6 border border-white/10 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto relative">
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         </div>
         <div>
           <h3 class="text-base font-bold text-white">Cancel Pending SolRecall Transfer?</h3>
@@ -1184,10 +1195,10 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
 
   <!-- 2. Deposit Address & QR Modal -->
   <div id="depositModal" class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
-    <div class="glass-panel rounded-3xl max-w-sm w-full p-6 border border-white/10 shadow-2xl text-center space-y-4 max-h-[90vh] overflow-y-auto">
+    <div class="glass-panel modal-panel rounded-3xl max-w-sm w-full p-6 border border-white/10 shadow-2xl text-center space-y-4 max-h-[90vh] overflow-y-auto relative">
       <div class="flex items-center justify-between">
         <h3 class="text-sm font-bold text-white">SolRecall Custodial Deposit Address</h3>
-        <button type="button" onclick="closeDepositModal()" class="text-slate-400 hover:text-white text-xs">✕</button>
+        <button type="button" onclick="closeDepositModal()" class="touch-target w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition flex items-center justify-center cursor-pointer" aria-label="Close modal"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
 
       <div class="bg-white p-3 rounded-2xl mx-auto inline-block shadow-md min-w-[184px] min-h-[184px] flex items-center justify-center">
@@ -1221,10 +1232,10 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
 
   <!-- 3. 2FA Setup Modal -->
   <div id="twoFaModal" class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
-    <div class="glass-panel rounded-3xl max-w-sm w-full p-6 border border-white/10 shadow-2xl space-y-4 text-center max-h-[90vh] overflow-y-auto">
+    <div class="glass-panel modal-panel rounded-3xl max-w-sm w-full p-6 border border-white/10 shadow-2xl space-y-4 text-center max-h-[90vh] overflow-y-auto relative">
       <div class="flex items-center justify-between">
         <h3 class="text-sm font-bold text-white">SolRecall 2FA Security Setup</h3>
-        <button type="button" onclick="close2FaModal()" class="text-slate-400 hover:text-white text-xs">✕</button>
+        <button type="button" onclick="close2FaModal()" class="touch-target w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition flex items-center justify-center cursor-pointer" aria-label="Close modal"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
 
       <div class="bg-white p-3 rounded-2xl mx-auto inline-block">
@@ -1250,17 +1261,15 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
 
   <!-- 3b. Delete / Reset 2FA Key Modal -->
   <div id="delete2FaModal" class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
-    <div class="glass-panel rounded-3xl max-w-sm w-full p-6 border border-rose-500/30 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+    <div class="glass-panel modal-panel rounded-3xl max-w-sm w-full p-6 border border-rose-500/30 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto relative">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2.5 text-rose-400">
           <div class="w-8 h-8 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-            </svg>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
           </div>
           <h3 class="text-sm font-bold text-white">Delete / Reset 2FA Key</h3>
         </div>
-        <button type="button" onclick="closeDelete2FaModal()" class="text-slate-400 hover:text-white text-xs">✕</button>
+        <button type="button" onclick="closeDelete2FaModal()" class="touch-target w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition flex items-center justify-center cursor-pointer" aria-label="Close modal"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
 
       <div class="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300 leading-relaxed text-left">
@@ -1290,14 +1299,14 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
 
   <!-- 4. Export Private Key Modal -->
   <div id="exportKeyModal" class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
-    <div class="glass-panel rounded-3xl max-w-md w-full p-6 border border-rose-500/40 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto relative">
+    <div class="glass-panel modal-panel rounded-3xl max-w-md w-full p-6 border border-rose-500/40 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto relative">
 
       <!-- Step 1: Verification -->
       <div id="exportKeyStep1" class="space-y-4">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             </div>
             <div>
               <h3 class="text-base font-bold text-white">SolRecall Security Check: Export Key</h3>
@@ -1305,7 +1314,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
             </div>
           </div>
           <button type="button" onclick="closeExportKeyModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
 
@@ -1335,7 +1344,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-2xl bg-purple-500/20 text-purple-400 border border-purple-500/30 flex items-center justify-center">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
             </div>
             <div>
               <h3 class="text-base font-bold text-white">SolRecall Custodial Solana Keypair</h3>
@@ -1343,7 +1352,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
             </div>
           </div>
           <button type="button" onclick="closeExportKeyModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
 
@@ -1390,7 +1399,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
                 id="revealCopyKeyBtn"
                 onclick="toggleRevealOrCopyKey()"
                 class="w-full py-3 px-4 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 shadow-lg shadow-purple-600/25 flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
           <span>Reveal Private Key</span>
         </button>
 
@@ -1409,13 +1418,13 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
 
   <!-- Dev Wallet Export Key Modal -->
   <div id="exportDevKeyModal" class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
-    <div class="glass-panel rounded-3xl max-w-md w-full p-6 border border-purple-500/40 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto relative">
+    <div class="glass-panel modal-panel rounded-3xl max-w-md w-full p-6 border border-purple-500/40 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto relative">
       <!-- Step 1: Verification -->
       <div id="exportDevKeyStep1" class="space-y-4">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-2xl bg-purple-500/20 text-purple-400 border border-purple-500/30 flex items-center justify-center">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
             </div>
             <div>
               <h3 class="text-base font-bold text-white">Export Dev Wallet Key</h3>
@@ -1423,7 +1432,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
             </div>
           </div>
           <button type="button" onclick="closeExportDevKeyModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
 
@@ -1461,7 +1470,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
             </div>
           </div>
           <button type="button" onclick="closeExportDevKeyModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
 
@@ -1500,7 +1509,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
 
   <!-- Dev Wallet Transfer Out / Sweep Modal -->
   <div id="transferDevFeesModal" class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
-    <div class="glass-panel rounded-3xl max-w-md w-full p-6 border border-purple-500/40 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto relative">
+    <div class="glass-panel modal-panel rounded-3xl max-w-md w-full p-6 border border-purple-500/40 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto relative">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-2xl bg-purple-500/20 text-purple-400 border border-purple-500/30 flex items-center justify-center">
@@ -1512,7 +1521,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
           </div>
         </div>
         <button type="button" onclick="closeTransferDevFeesModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
 
@@ -1574,11 +1583,11 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
 
   <!-- 5. Phantom-Style Transfer Loading & Success Receipt Modal -->
   <div id="transferReceiptModal" class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
-    <div class="glass-panel rounded-3xl max-w-md w-full p-6 sm:p-8 border border-white/10 shadow-[0_0_60px_rgba(0,0,0,0.85)] text-center relative overflow-hidden backdrop-blur-2xl transition-all duration-300">
+    <div class="glass-panel modal-panel rounded-3xl max-w-md w-full p-6 sm:p-8 border border-white/10 shadow-[0_0_60px_rgba(0,0,0,0.85)] text-center relative overflow-hidden backdrop-blur-2xl transition-all duration-300 max-h-[90vh] overflow-y-auto">
 
       <!-- Ambient Glows -->
-      <div class="absolute -top-24 -left-24 w-48 h-48 bg-purple-600/20 rounded-full blur-3xl pointer-events-none"></div>
-      <div class="absolute -top-24 -right-24 w-48 h-48 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none"></div>
+      
+      
 
       <!-- Close Button (Visible on Success) -->
       <button type="button"
@@ -1586,14 +1595,14 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
               onclick="closeTransferReceiptModal()"
               class="hidden absolute top-4 right-4 text-slate-400 hover:text-white p-2 rounded-xl hover:bg-white/5 transition z-10 cursor-pointer"
               title="Close">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
 
       <!-- VIEW A: Full-Fidelity Loading Screen -->
       <div id="transferReceiptLoadingView" class="py-6 space-y-6">
         <!-- Animated Progress Ring with Pulsing Solana Shield -->
         <div class="relative w-28 h-28 mx-auto flex items-center justify-center">
-          <div class="absolute inset-0 rounded-full bg-purple-500/20 blur-xl animate-pulse"></div>
+          
           
           <!-- Animated SVG Progress Ring -->
           <svg class="w-28 h-28 -rotate-90 transform" viewBox="0 0 100 100">
@@ -1611,9 +1620,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
           <!-- Centered Pulsing Solana Shield Icon -->
           <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-600/30 to-emerald-500/20 border border-purple-500/40 flex items-center justify-center shadow-lg shadow-purple-500/20 animate-pulse-ring">
-              <svg class="w-7 h-7 text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-              </svg>
+              <svg class="w-7 h-7 text-purple-300" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
             </div>
           </div>
         </div>
@@ -1627,7 +1634,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
 
         <!-- Micro status pulse steps -->
         <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/80 border border-white/5 text-[11px] text-purple-300 font-mono">
-          <span class="w-2 h-2 rounded-full bg-purple-400 animate-ping"></span>
+          <span class="w-2 h-2 rounded-full bg-purple-400 shrink-0"></span>
           <span id="transferReceiptLoadingStep">Validating timelock & reserving escrow balance...</span>
         </div>
       </div>
@@ -1637,11 +1644,9 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
         
         <!-- Glowing green checkmark / shield badge -->
         <div class="relative w-20 h-20 mx-auto flex items-center justify-center">
-          <div class="absolute inset-0 rounded-full bg-emerald-500/30 blur-xl animate-pulse"></div>
+          
           <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-emerald-500/20 via-emerald-500/30 to-purple-500/20 border-2 border-emerald-400/60 flex items-center justify-center shadow-[0_0_30px_rgba(20,241,149,0.35)]">
-            <svg class="w-10 h-10 text-emerald-400 drop-shadow-[0_0_8px_rgba(20,241,149,0.6)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-            </svg>
+            <svg class="w-10 h-10 text-emerald-400 drop-shadow-[0_0_8px_rgba(20,241,149,0.6)]" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
           </div>
         </div>
 
@@ -1691,7 +1696,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
           <div class="flex items-center justify-between text-xs pt-2.5 border-t border-white/5">
             <span class="text-slate-400 font-medium">Status:</span>
             <span id="receiptStatusBadge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-              <span id="receiptStatusDot" class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+              <span id="receiptStatusDot" class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"></span>
               <span id="receiptStatusText">Pending Escrow</span>
             </span>
           </div>
@@ -1724,7 +1729,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
             <span class="text-slate-400 font-medium">Solana Explorer:</span>
             <a id="receiptExplorerLink" href="https://solscan.io/" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 font-mono text-purple-400 hover:text-purple-300 hover:underline">
               <span id="receiptExplorerLinkText">View on Solscan</span>
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
             </a>
           </div>
 
@@ -1739,9 +1744,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
         <!-- Explainer note -->
         <div class="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-left flex items-start gap-3">
           <div class="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
           </div>
           <p class="text-xs text-amber-200/90 leading-relaxed font-medium">
             Funds can be revoked and refunded instantly before the countdown expires.
@@ -1755,9 +1758,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
                   id="receiptCopyShareBtn"
                   onclick="copyReceiptShareText()"
                   class="w-full py-3.5 px-4 rounded-xl font-bold text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 border border-purple-400/30 transition shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 text-xs sm:text-sm active:scale-95 cursor-pointer">
-            <svg class="w-4 h-4 text-purple-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
-            </svg>
+            <svg class="w-4 h-4 text-purple-200" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
             <span id="receiptCopyShareBtnText">Copy Share Text</span>
           </button>
 
@@ -1765,10 +1766,7 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
           <button type="button"
                   onclick="viewReceiptInActiveHolds()"
                   class="w-full py-3 px-4 rounded-xl font-semibold text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700/80 border border-white/10 transition flex items-center justify-center gap-2 text-xs cursor-pointer">
-            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-            </svg>
+            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
             <span>View in Active Holds</span>
           </button>
         </div>
@@ -1778,26 +1776,178 @@ $ssrActiveStablesEscrow = $ssrActiveUsdcEscrow + $ssrActiveUsdtEscrow;
     </div>
   </div>
 
+  
+  <!-- ========================================================================= -->
+  <!-- SLIDE-OVER MOBILE DRAWER (#mobileDrawer)                                  -->
+  <!-- ========================================================================= -->
+  <div id="mobileDrawer" class="mobile-drawer-root" role="dialog" aria-modal="true" aria-label="Mobile Navigation">
+    
+    <!-- Backdrop Blur Overlay -->
+    <div id="mobileDrawerBackdrop" class="mobile-drawer-backdrop" onclick="typeof closeMobileDrawer === 'function' && closeMobileDrawer()"></div>
+
+    <!-- Drawer Panel (Smooth 60fps hardware-accelerated slide-in) -->
+    <aside id="mobileDrawerPanel" class="mobile-drawer-panel">
+
+      <!-- Top: Brand Header & Close Button -->
+      <div class="p-5 border-b border-[#222228] flex items-center justify-between bg-[#08080a]">
+        <div class="flex items-center gap-3">
+          <img src="/assets/img/logo.png" alt="SolRecall Logo" class="w-9 h-9 rounded-xl border border-[#222228] object-cover shadow-sm">
+          <div class="flex items-center gap-2">
+            <span class="text-base font-bold tracking-tight text-white font-display">SolRecall</span>
+            <span class="text-[10px] font-bold text-amber-400 uppercase font-timelock px-1.5 py-0.5 rounded bg-amber-400/10 border border-amber-400/20">v2.0</span>
+          </div>
+        </div>
+        <button type="button"
+                data-drawer-close
+                onclick="typeof closeMobileDrawer === 'function' && closeMobileDrawer()"
+                class="btn-drawer-close w-9 h-9 flex items-center justify-center rounded-xl text-[#94949e] hover:text-white bg-[#141418] border border-[#222228] hover:border-[#2a2a34] transition cursor-pointer"
+                aria-label="Close Mobile Drawer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Center Scrollable Content -->
+      <div class="flex-1 px-5 py-4 space-y-5 overflow-y-auto bg-[#08080a]">
+
+        <!-- Network Pill ("Solana Mainnet-Beta" with solid green indicator) -->
+        <div class="flex items-center justify-between p-2.5 rounded-xl bg-[#121215] border border-[#222228]">
+          <span class="text-[10px] font-bold text-[#94949e] font-nav tracking-wider">NETWORK STATUS</span>
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
+            <span class="font-medium">Solana Mainnet-Beta</span>
+          </span>
+        </div>
+
+        <!-- Active User Chip with Sol balance -->
+        <div class="p-4 rounded-2xl bg-[#141418] border border-[#222228] space-y-3">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-zinc-800 border border-[#222228] flex items-center justify-center text-xs font-bold text-white shadow-md font-nav">
+              <?= strtoupper(substr($username, 0, 2)) ?>
+            </div>
+            <div class="overflow-hidden">
+              <div class="text-sm font-bold text-white font-display truncate"><?= $username ?></div>
+              <div class="text-xs text-[#94949e] font-body truncate"><?= $userEmail ?: 'Protected Account' ?></div>
+            </div>
+          </div>
+
+          <div class="pt-2 border-t border-[#222228] flex items-baseline justify-between">
+            <span class="text-xs text-[#94949e] font-nav">SOL Available:</span>
+            <div class="text-right">
+              <span id="drawerUserSolBalance" class="text-2xl font-bold text-white font-stats tracking-wider"><?= number_format($ssrSolAvail, 4, '.', '') ?> SOL</span>
+              <?php if ($ssrSolEscrow > 0): ?>
+                <div class="text-[11px] text-amber-400 font-mono font-medium">+<?= number_format($ssrSolEscrow, 4, '.', '') ?> In Escrow</div>
+              <?php endif; ?>
+            </div>
+          </div>
+        </div>
+
+        <!-- Custodial Deposit Address with 1-click copy -->
+        <div class="p-3.5 rounded-2xl bg-[#0f0f13] border border-[#222228] space-y-2">
+          <div class="flex items-center justify-between text-xs font-nav text-[#94949e]">
+            <span class="font-bold tracking-wider">CUSTODIAL DEPOSIT ADDRESS</span>
+            <button type="button"
+                    id="drawerCopyAddressBtn"
+                    onclick="copyDrawerDepositAddress()"
+                    class="text-[11px] text-white hover:text-zinc-300 font-cta font-semibold flex items-center gap-1 transition cursor-pointer">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+              <span id="drawerCopyFeedback">Copy</span>
+            </button>
+          </div>
+          <div class="flex items-center justify-between p-2 rounded-xl bg-[#000000] border border-[#222228]">
+            <span id="drawerDepositAddressTruncated"
+                  class="font-crypto text-xs text-zinc-300 truncate font-mono"
+                  data-full="<?= $depositAddress ?>"><?= !empty($depositAddress) ? (strlen($depositAddress) > 16 ? substr($depositAddress, 0, 8) . '...' . substr($depositAddress, -8) : $depositAddress) : 'No address assigned' ?></span>
+            <button type="button" onclick="openDepositModal(); typeof closeMobileDrawer === 'function' && closeMobileDrawer();" class="text-xs text-white hover:text-zinc-300 px-2 py-1 rounded bg-[#141418] border border-[#222228] shrink-0 font-cta cursor-pointer">QR</button>
+          </div>
+        </div>
+
+        <!-- Navigation Links -->
+        <nav class="space-y-1.5 pt-1">
+          <div class="px-2 pb-1 text-[10px] font-bold text-[#94949e] uppercase font-nav tracking-wider">Navigation</div>
+          
+          <!-- Overview / Dashboard -->
+          <button type="button"
+                  data-tab-target="overview"
+                  onclick="switchTab('overview'); typeof closeMobileDrawer === 'function' && closeMobileDrawer();"
+                  class="drawer-nav-item w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-white hover:bg-[#141418] border border-transparent hover:border-[#222228] transition font-nav text-left cursor-pointer">
+            <svg class="w-4 h-4 text-white shrink-0" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+            <span>Overview</span>
+          </button>
+
+          <!-- Send / Escrow -->
+          <button type="button"
+                  onclick="switchTab('overview'); scrollToEscrowForm(); typeof closeMobileDrawer === 'function' && closeMobileDrawer();"
+                  class="drawer-nav-item w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-white hover:bg-[#141418] border border-transparent hover:border-[#222228] transition font-nav text-left cursor-pointer">
+            <svg class="w-4 h-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            <span>Send / Escrow</span>
+          </button>
+
+          <!-- Transfer History -->
+          <button type="button"
+                  data-tab-target="history"
+                  onclick="switchTab('history'); typeof closeMobileDrawer === 'function' && closeMobileDrawer();"
+                  class="drawer-nav-item w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-white hover:bg-[#141418] border border-transparent hover:border-[#222228] transition font-nav text-left cursor-pointer">
+            <svg class="w-4 h-4 text-[#94949e] shrink-0" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>Transfer History</span>
+          </button>
+
+          <!-- Settings & 2FA -->
+          <button type="button"
+                  data-tab-target="settings"
+                  onclick="switchTab('settings'); typeof closeMobileDrawer === 'function' && closeMobileDrawer();"
+                  class="drawer-nav-item w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-white hover:bg-[#141418] border border-transparent hover:border-[#222228] transition font-nav text-left cursor-pointer">
+            <svg class="w-4 h-4 text-[#94949e] shrink-0" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <span>Settings & 2FA</span>
+          </button>
+
+          <?php if ($isAdmin): ?>
+          <!-- Admin Ops -->
+          <button type="button"
+                  data-tab-target="admin"
+                  onclick="switchTab('admin'); typeof closeMobileDrawer === 'function' && closeMobileDrawer();"
+                  class="drawer-nav-item w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-amber-400 hover:bg-amber-400/10 border border-transparent hover:border-amber-400/20 transition font-nav text-left cursor-pointer">
+            <svg class="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+            <span>Admin Operations</span>
+          </button>
+          <?php endif; ?>
+        </nav>
+
+      </div>
+
+      <!-- Bottom: Disconnect / Logout Button -->
+      <div class="p-5 border-t border-[#222228] space-y-3 bg-[#08080a]">
+        <a href="/api/auth/logout"
+           id="drawerLogoutBtn"
+           class="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-bold text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 transition font-cta cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <span>Disconnect & Sign Out</span>
+        </a>
+        <div class="text-center text-[10px] text-[#71717a] font-nav tracking-wider">
+          SOLRECALL PROTOCOL &bull; MAINNET V2.0
+        </div>
+      </div>
+
+    </aside>
+  </div>
+
   <!-- Toast Container -->
   <div id="toast-container"></div>
 
-  <!-- Mobile Menu & Deposit Modal Inline Helpers -->
+    <!-- Mobile Menu & Deposit Modal Inline Helpers -->
   <script>
     function toggleMobileMenu(force) {
-      const menu = document.getElementById('mobileDropdownMenu');
-      const openIcon = document.getElementById('hamburgerOpenIcon');
-      const closeIcon = document.getElementById('hamburgerCloseIcon');
-      if (!menu) return;
-
-      const shouldOpen = force !== undefined ? force : menu.classList.contains('hidden');
-      if (shouldOpen) {
-        menu.classList.remove('hidden');
-        if (openIcon) openIcon.classList.add('hidden');
-        if (closeIcon) closeIcon.classList.remove('hidden');
-      } else {
-        menu.classList.add('hidden');
-        if (openIcon) openIcon.classList.remove('hidden');
-        if (closeIcon) closeIcon.classList.add('hidden');
+      if (typeof window.toggleMobileDrawer === 'function') {
+        window.toggleMobileDrawer();
+      }
+    }
+    function openMobileMenu() {
+      if (typeof window.openMobileDrawer === 'function') {
+        window.openMobileDrawer();
+      }
+    }
+    function closeMobileMenu() {
+      if (typeof window.closeMobileDrawer === 'function') {
+        window.closeMobileDrawer();
       }
     }
 

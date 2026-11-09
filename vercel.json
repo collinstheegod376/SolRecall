@@ -24,7 +24,11 @@
     },
     {
       "src": "/favicon.ico",
-      "dest": "/public/assets/img/logo.png"
+      "dest": "/public/favicon.ico"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "dest": "/public/apple-touch-icon.png"
     },
     {
       "src": "/api/cron",

@@ -59,13 +59,13 @@
 
     let iconSvg = '';
     if (type === 'success') {
-      iconSvg = `<svg class="w-5 h-5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`;
+      iconSvg = `<svg class="w-5 h-5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`;
     } else if (type === 'error') {
-      iconSvg = `<svg class="w-5 h-5 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`;
+      iconSvg = `<svg class="w-5 h-5 text-rose-400 shrink-0" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`;
     } else if (type === 'warning') {
-      iconSvg = `<svg class="w-5 h-5 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>`;
+      iconSvg = `<svg class="w-5 h-5 text-amber-400 shrink-0" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
     } else {
-      iconSvg = `<svg class="w-5 h-5 text-purple-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
+      iconSvg = `<svg class="w-5 h-5 text-purple-400 shrink-0" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`;
     }
 
     toast.innerHTML = `
@@ -395,6 +395,17 @@
       }
     }
 
+    
+    const drawerDepositEl = document.getElementById('drawerDepositAddressTruncated');
+    if (drawerDepositEl && user && user.solana_deposit_address) {
+      drawerDepositEl.textContent = truncateAddress(user.solana_deposit_address, 8, 8);
+      drawerDepositEl.dataset.full = user.solana_deposit_address;
+    }
+    const drawerSolBal = document.getElementById('drawerUserSolBalance');
+    if (drawerSolBal && balances && balances.SOL) {
+      drawerSolBal.textContent = formatAmount(parseFloat(balances.SOL.available) || 0, 4) + ' SOL';
+    }
+
     // Render Balance Cards
     const balances = AppState.balances;
     const solPrice = (balances.SOL && balances.SOL.price) ? balances.SOL.price : 185.0;
@@ -510,7 +521,7 @@
     }
   }
 
-  // Render Pending Transfers Section
+  // Render Pending Transfers Section with Dual Desktop Table & Sleek Mobile Cards
   function renderPendingTransfers() {
     const container = document.getElementById('pendingTransfersContainer');
     const emptyState = document.getElementById('pendingTransfersEmpty');
@@ -544,7 +555,8 @@
 
     if (emptyState) emptyState.classList.add('hidden');
 
-    const html = AppState.pendingTransfers.map(t => {
+    // Build Desktop Table Rows
+    const desktopRowsHtml = AppState.pendingTransfers.map(t => {
       const remaining = calculateRemainingSeconds(t);
       const total = t.total_seconds || (AppState.settings.undoWindowMinutes * 60);
       const percent = Math.min(100, Math.max(0, (remaining / total) * 100));
@@ -553,72 +565,152 @@
       const tLogo = tokenLogos[t.token] || tokenLogos.SOL;
 
       return `
-        <div id="pending-card-${t.id}" class="glass-panel glass-panel-hover rounded-2xl p-5 relative overflow-hidden transition-all duration-300 border-l-4 ${isUrgent ? 'border-l-rose-500' : 'border-l-amber-500'}">
-          <!-- Top Row: Token & Amount + Countdown Timer -->
-          <div class="flex items-start justify-between gap-4 mb-3">
-            <div class="flex items-center gap-3">
-              <div class="relative shrink-0">
-                <img src="${tLogo.url}" onerror="this.src='${tLogo.local}'" alt="${t.token}" class="w-8 h-8 rounded-full object-contain p-0.5 bg-black/50 border border-white/10">
-              </div>
+        <tr data-pending-card="${t.id}" id="pending-row-${t.id}" class="hover:bg-white/[0.02] transition-colors duration-200">
+          <td class="py-3.5 px-4">
+            <div class="flex items-center gap-2.5">
+              <img src="${tLogo.url}" onerror="this.src='${tLogo.local}'" alt="${t.token}" class="w-7 h-7 rounded-full object-contain p-0.5 bg-black/40 border border-white/10 shrink-0">
               <div>
-                <div class="text-xl font-bold text-white tracking-tight flex items-baseline gap-1.5">
-                  ${formatAmount(t.amount, t.token === 'SOL' ? 4 : 2)} <span class="text-xs font-semibold text-slate-300">${t.token}</span>
+                <div class="font-bold text-white font-mono text-sm">
+                  ${formatAmount(t.amount, t.token === 'SOL' ? 4 : 2)} <span class="text-xs text-slate-400 font-sans font-normal">${t.token}</span>
                 </div>
-                ${t.note ? `<p class="text-xs text-slate-400 truncate max-w-xs">${escapeHtml(t.note)}</p>` : ''}
+                ${t.note ? `<div class="text-[11px] text-slate-400 truncate max-w-[140px]">“${escapeHtml(t.note)}”</div>` : ''}
+              </div>
+            </div>
+          </td>
+          <td class="py-3.5 px-4">
+            <div class="flex items-center gap-1.5 font-mono text-xs text-slate-300">
+              <span class="bg-slate-900/80 px-2 py-1 rounded border border-white/5 font-semibold text-purple-300" title="${t.destination}">
+                ${truncateAddress(t.destination, 4, 4)}
+              </span>
+              <button type="button" class="touch-target w-8 h-8 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition flex items-center justify-center cursor-pointer" title="Copy Address" onclick="copyToClipboard('${t.destination}', 'Recipient address')">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+              </button>
+            </div>
+          </td>
+          <td class="py-3.5 px-4">
+            <div class="space-y-1.5 min-w-[130px]">
+              <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-mono font-bold ${isUrgent ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' : 'bg-amber-500/10 text-amber-300 border border-amber-500/30'}">
+                <svg class="w-3.5 h-3.5 ${isUrgent ? 'text-rose-400' : 'text-amber-400'}" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span data-timer-id="${t.id}">${timeFormatted}</span>
+              </div>
+              <div class="w-full bg-slate-800/80 rounded-full h-1.5 overflow-hidden border border-white/5">
+                <div data-progress-id="${t.id}" class="progress-bar-draining h-full rounded-full ${isUrgent ? 'urgent bg-gradient-to-r from-rose-500 to-amber-500' : 'bg-gradient-to-r from-amber-400 to-amber-500'}" style="width: ${percent}%;"></div>
+              </div>
+            </div>
+          </td>
+          <td class="py-3.5 px-4 text-right whitespace-nowrap">
+            <div class="flex items-center justify-end gap-2">
+              <button type="button"
+                      class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-purple-500/10 hover:bg-purple-500/25 text-purple-300 hover:text-white border border-purple-500/30 hover:border-purple-500/60 transition shadow-sm cursor-pointer"
+                      onclick="openTransferReceiptById(${t.id})">
+                <svg class="w-3.5 h-3.5 text-purple-400" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                <span>Receipt</span>
+              </button>
+              <button type="button"
+                      class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-500/15 hover:bg-rose-500/30 text-rose-300 hover:text-white border border-rose-500/40 hover:border-rose-500/70 transition shadow-sm cursor-pointer"
+                      onclick="openCancelModal(${t.id})">
+                <svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>
+                <span>Cancel</span>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    // Build Mobile High-Conviction Cards
+    const mobileCardsHtml = AppState.pendingTransfers.map(t => {
+      const remaining = calculateRemainingSeconds(t);
+      const total = t.total_seconds || (AppState.settings.undoWindowMinutes * 60);
+      const percent = Math.min(100, Math.max(0, (remaining / total) * 100));
+      const isUrgent = remaining <= 60;
+      const timeFormatted = formatMMSS(remaining);
+      const tLogo = tokenLogos[t.token] || tokenLogos.SOL;
+
+      return `
+        <div data-pending-card="${t.id}" id="pending-card-${t.id}" class="glass-panel glass-panel-hover rounded-2xl p-4 sm:p-5 relative overflow-hidden transition-all duration-300 border-l-4 ${isUrgent ? 'border-l-rose-500' : 'border-l-amber-500'} space-y-3">
+          <!-- Top Row: Token & Amount + Countdown Timer -->
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+              <img src="${tLogo.url}" onerror="this.src='${tLogo.local}'" alt="${t.token}" class="w-8 h-8 rounded-full object-contain p-0.5 bg-black/50 border border-white/10 shrink-0">
+              <div>
+                <div class="text-lg font-bold text-white tracking-tight font-mono">
+                  ${formatAmount(t.amount, t.token === 'SOL' ? 4 : 2)} <span class="text-xs font-semibold text-slate-300 font-sans">${t.token}</span>
+                </div>
+                ${t.note ? `<p class="text-[11px] text-slate-400 truncate max-w-[180px]">“${escapeHtml(t.note)}”</p>` : ''}
               </div>
             </div>
 
-            <!-- Timer pill (clean, without blinking/loading circles) -->
-            <div class="text-right">
+            <!-- Timer pill -->
+            <div class="text-right shrink-0">
               <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold ${isUrgent ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' : 'bg-amber-500/10 text-amber-300 border border-amber-500/30'}">
-                <svg class="w-3.5 h-3.5 ${isUrgent ? 'text-rose-400' : 'text-amber-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-                <span id="timer-text-${t.id}">${timeFormatted}</span>
+                <svg class="w-3.5 h-3.5 ${isUrgent ? 'text-rose-400' : 'text-amber-400'}" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span data-timer-id="${t.id}">${timeFormatted}</span>
               </div>
-              <div class="text-[11px] text-slate-400 mt-1">Undo Window Active</div>
+              <div class="text-[10px] text-slate-400 mt-0.5">Undo Window Active</div>
             </div>
           </div>
 
           <!-- Draining Animated Progress Bar -->
-          <div class="w-full bg-slate-800/80 rounded-full h-2 mb-4 overflow-hidden p-0.5 border border-white/5">
-            <div id="progress-bar-${t.id}"
+          <div class="w-full bg-slate-800/80 rounded-full h-2 overflow-hidden p-0.5 border border-white/5">
+            <div data-progress-id="${t.id}"
                  class="progress-bar-draining h-full rounded-full ${isUrgent ? 'urgent bg-gradient-to-r from-rose-500 to-amber-500' : 'bg-gradient-to-r from-amber-400 to-amber-500'}"
                  style="width: ${percent}%;"></div>
           </div>
 
-          <!-- Bottom Row: Recipient & Cancel Button -->
-          <div class="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-white/5">
-            <div class="flex items-center gap-2 text-xs text-slate-300">
+          <!-- Recipient Row with >= 44px touch target copy button -->
+          <div class="flex items-center justify-between text-xs bg-slate-900/60 px-3 py-1 rounded-xl border border-white/5">
+            <div class="flex items-center gap-1.5 truncate">
               <span class="text-slate-400">To:</span>
-              <span class="font-mono bg-slate-900/80 px-2 py-1 rounded border border-white/5" title="${t.destination}">
-                ${truncateAddress(t.destination, 6, 6)}
-              </span>
-              <button type="button" class="text-slate-400 hover:text-white p-1 rounded hover:bg-white/5 transition" title="Copy Address" onclick="copyToClipboard('${t.destination}', 'Recipient address')">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"/></svg>
-              </button>
+              <span class="font-mono text-purple-300 font-semibold truncate" title="${t.destination}">${truncateAddress(t.destination, 6, 6)}</span>
             </div>
+            <button type="button" class="touch-target w-10 h-10 min-w-[40px] min-h-[40px] text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition flex items-center justify-center cursor-pointer shrink-0" title="Copy Address" onclick="copyToClipboard('${t.destination}', 'Recipient address')">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+            </button>
+          </div>
 
-            <div class="flex items-center gap-2">
-              <button type="button"
-                      class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-purple-500/10 hover:bg-purple-500/25 text-purple-300 hover:text-white border border-purple-500/30 hover:border-purple-500/60 transition shadow-sm cursor-pointer"
-                      onclick="openTransferReceiptById(${t.id})">
-                <svg class="w-3.5 h-3.5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                Receipt
-              </button>
-              <button type="button"
-                      class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/25 text-rose-300 hover:text-white border border-rose-500/30 hover:border-rose-500/60 transition shadow-sm cursor-pointer"
-                      onclick="openCancelModal(${t.id})">
-                <svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
-                Cancel Transfer (Undo)
-              </button>
-            </div>
+          <!-- Bottom Action Buttons: Comfortable >= 44px Touch Targets -->
+          <div class="grid grid-cols-2 gap-2.5 pt-1">
+            <button type="button"
+                    class="touch-target min-h-[44px] w-full inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold bg-purple-500/10 hover:bg-purple-500/25 text-purple-300 hover:text-white border border-purple-500/30 hover:border-purple-500/60 transition shadow-sm cursor-pointer active:scale-95"
+                    onclick="openTransferReceiptById(${t.id})">
+              <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+              <span>Receipt</span>
+            </button>
+            <button type="button"
+                    class="touch-target min-h-[44px] w-full inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold bg-rose-500/15 hover:bg-rose-500/30 text-rose-300 hover:text-white border border-rose-500/40 hover:border-rose-500/70 transition shadow-sm cursor-pointer active:scale-95"
+                    onclick="openCancelModal(${t.id})">
+              <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>
+              <span>Cancel Undo</span>
+            </button>
           </div>
         </div>
       `;
     }).join('');
 
-    container.innerHTML = html;
+    // Render Both Desktop and Mobile
+    container.innerHTML = `
+      <div class="hidden md:block glass-panel rounded-2xl border border-white/10 overflow-hidden shadow-lg">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-white/10 bg-slate-900/60 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                <th class="py-3 px-4">Asset & Amount</th>
+                <th class="py-3 px-4">Recipient</th>
+                <th class="py-3 px-4">Escrow Countdown</th>
+                <th class="py-3 px-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-white/5">
+              ${desktopRowsHtml}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="md:hidden space-y-3">
+        ${mobileCardsHtml}
+      </div>
+    `;
   }
 
   // Calculate remaining seconds for a transfer with UTC normalization
@@ -651,24 +743,26 @@
   function dissolveExpiredTransfer(transfer) {
     if (!transfer) return;
     const transferId = transfer.id;
-    const cardEl = document.getElementById(`pending-card-${transferId}`);
+    const elementsToDissolve = document.querySelectorAll(`[data-pending-card="${transferId}"]`);
 
-    if (cardEl) {
-      // Instantly apply a smooth fade-out CSS animation (opacity 0, scale 0.95)
-      cardEl.classList.add('card-dissolve');
-      cardEl.style.transition = 'opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), max-height 0.35s ease, margin 0.35s ease, padding 0.35s ease';
-      cardEl.style.opacity = '0';
-      cardEl.style.transform = 'scale(0.95)';
-      cardEl.style.pointerEvents = 'none';
+    if (elementsToDissolve.length > 0) {
+      elementsToDissolve.forEach(el => {
+        el.classList.add('card-dissolve');
+        el.style.transition = 'opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), max-height 0.4s ease, margin 0.4s ease, padding 0.4s ease';
+        el.style.opacity = '0';
+        el.style.transform = 'translate3d(0, -8px, 0) scale(0.96)';
+        el.style.pointerEvents = 'none';
+      });
 
       // Remove from DOM within 350ms
       setTimeout(() => {
-        if (cardEl && cardEl.parentNode) {
-          cardEl.remove();
-        }
+        elementsToDissolve.forEach(el => {
+          if (el && el.parentNode) el.remove();
+        });
         const container = document.getElementById('pendingTransfersContainer');
         const emptyState = document.getElementById('pendingTransfersEmpty');
-        if (container && (!container.children || container.children.length === 0) && emptyState) {
+        if (AppState.pendingTransfers.length === 0 && emptyState) {
+          if (container) container.innerHTML = '';
           emptyState.classList.remove('hidden');
         }
       }, 350);
@@ -736,21 +830,21 @@
         const percent = Math.min(100, Math.max(0, (remaining / total) * 100));
         const isUrgent = remaining <= 60;
 
-        const timerTextEl = document.getElementById(`timer-text-${t.id}`);
-        const progressBarEl = document.getElementById(`progress-bar-${t.id}`);
+        const timerTextEls = document.querySelectorAll(`[data-timer-id="${t.id}"]`);
+        const progressBarEls = document.querySelectorAll(`[data-progress-id="${t.id}"]`);
 
-        if (timerTextEl) {
-          timerTextEl.textContent = formatMMSS(remaining);
-        }
+        timerTextEls.forEach(el => {
+          el.textContent = formatMMSS(remaining);
+        });
 
-        if (progressBarEl) {
-          progressBarEl.style.width = `${percent}%`;
+        progressBarEls.forEach(el => {
+          el.style.width = `${percent}%`;
           if (isUrgent) {
-            progressBarEl.classList.add('urgent');
+            el.classList.add('urgent');
           } else {
-            progressBarEl.classList.remove('urgent');
+            el.classList.remove('urgent');
           }
-        }
+        });
       });
 
       if (expiredList.length > 0) {
@@ -872,11 +966,11 @@
 
           const protectionBadge = isEscrow
             ? `<div class="flex items-center gap-2 text-amber-300 font-bold mb-2 pb-2 border-b border-amber-500/20">
-                <svg class="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                <svg class="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
                 <span>🛡️ Protected by ${humanWin} Escrow Hold</span>
                </div>`
             : `<div class="flex items-center gap-2 text-purple-300 font-bold mb-2 pb-2 border-b border-purple-500/20">
-                <svg class="w-4 h-4 text-purple-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                <svg class="w-4 h-4 text-purple-400 shrink-0" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                 <span>⚡ Instant On-Chain Broadcast (&gt; ${threshold} ${token})</span>
                </div>`;
 
@@ -1357,7 +1451,7 @@
       } else {
         statusTextEl.textContent = 'Pending Escrow';
         statusBadgeEl.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30';
-        if (statusDotEl) statusDotEl.className = 'w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse';
+        if (statusDotEl) statusDotEl.className = 'w-1.5 h-1.5 rounded-full bg-amber-400';
       }
     }
 
@@ -1573,8 +1667,9 @@
   // History Table Rendering & Filter (Supports Pending Escrow, Completed, Cancelled, Failed)
   function renderHistoryTable() {
     const tbody = document.getElementById('historyTableBody');
+    const mobileList = document.getElementById('historyMobileList');
     const emptyRow = document.getElementById('historyEmptyRow');
-    if (!tbody) return;
+    if (!tbody && !mobileList) return;
 
     const filter = AppState.currentHistoryFilter;
     const search = AppState.historySearchTerm.toLowerCase();
@@ -1626,102 +1721,212 @@
     });
 
     if (filtered.length === 0) {
-      tbody.innerHTML = '';
+      if (tbody) tbody.innerHTML = '';
+      if (mobileList) mobileList.innerHTML = '';
       if (emptyRow) emptyRow.classList.remove('hidden');
       return;
     }
 
     if (emptyRow) emptyRow.classList.add('hidden');
 
-    tbody.innerHTML = filtered.map(t => {
-      // Status badge
-      let badgeClass = 'badge-completed';
-      let statusLabel = 'Completed';
-      let icon = `<svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`;
+    // Build Desktop Table HTML
+    if (tbody) {
+      tbody.innerHTML = filtered.map(t => {
+        // Status badge
+        let badgeClass = 'badge-completed';
+        let statusLabel = 'Completed';
+        let icon = `<svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`;
 
-      if (t.status === 'cancelled') {
-        badgeClass = 'badge-cancelled';
-        statusLabel = 'Cancelled';
-        icon = `<svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>`;
-      } else if (t.status === 'failed') {
-        badgeClass = 'badge-failed';
-        statusLabel = 'Failed';
-        icon = `<svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`;
-      } else if (t.status === 'pending') {
-        badgeClass = 'badge-pending';
-        statusLabel = 'Pending Escrow';
-        icon = `<svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
-      } else if (t.status === 'processing') {
-        badgeClass = 'badge-processing';
-        statusLabel = 'Broadcasting';
-        icon = `<span class="spinner-sm inline-block"></span>`;
-      }
+        if (t.status === 'cancelled') {
+          badgeClass = 'badge-cancelled';
+          statusLabel = 'Cancelled';
+          icon = `<svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>`;
+        } else if (t.status === 'failed') {
+          badgeClass = 'badge-failed';
+          statusLabel = 'Failed';
+          icon = `<svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`;
+        } else if (t.status === 'pending') {
+          badgeClass = 'badge-pending';
+          statusLabel = 'Pending Escrow';
+          icon = `<svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
+        } else if (t.status === 'processing') {
+          badgeClass = 'badge-processing';
+          statusLabel = 'Broadcasting';
+          icon = `<span class="spinner-sm inline-block"></span>`;
+        }
 
-      const dateStr = t.created_at ? new Date(t.created_at).toLocaleString('en-US', {
-        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-      }) : 'Recent';
+        const dateStr = t.created_at ? new Date(t.created_at).toLocaleString('en-US', {
+          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        }) : 'Recent';
 
-      // Explorer link: links to tx signature on Solscan if broadcast, or destination account on Solscan if pending escrow hold
-      let explorerHtml = `<span class="text-slate-500 text-xs">—</span>`;
-      if (t.tx_signature) {
-        const explorerUrl = `https://solscan.io/tx/${t.tx_signature}`;
-        explorerHtml = `
-          <a href="${explorerUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 font-mono transition" title="View on Solscan">
-            <span>${truncateAddress(t.tx_signature, 4, 4)}</span>
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-          </a>
+        let explorerHtml = `<span class="text-slate-500 text-xs">—</span>`;
+        if (t.tx_signature) {
+          const explorerUrl = `https://solscan.io/tx/${t.tx_signature}`;
+          explorerHtml = `
+            <a href="${explorerUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 font-mono transition" title="View on Solscan">
+              <span>${truncateAddress(t.tx_signature, 4, 4)}</span>
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            </a>
+          `;
+        } else if (t.status === 'pending') {
+          const explorerUrl = `https://solscan.io/account/${t.destination}`;
+          explorerHtml = `
+            <a href="${explorerUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 font-mono transition" title="View recipient address on Solscan">
+              <span>Escrow Hold</span>
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            </a>
+          `;
+        }
+
+        const tLogo = tokenLogos[t.token] || tokenLogos.SOL;
+
+        return `
+          <tr class="border-b border-white/5 hover:bg-white/[0.02] transition text-sm">
+            <td class="py-3.5 px-4 text-slate-400 text-xs whitespace-nowrap">${dateStr}</td>
+            <td class="py-3.5 px-4">
+              <div class="flex items-center gap-2 font-semibold text-white font-mono">
+                <img src="${tLogo.url}" onerror="this.src='${tLogo.local}'" alt="${t.token}" class="w-5 h-5 rounded-full object-contain shrink-0 p-0.5 bg-black/40 border border-white/10">
+                <span>${formatAmount(t.amount, t.token === 'SOL' ? 4 : 2)} <span class="text-xs text-slate-400 font-sans font-normal">${t.token}</span></span>
+              </div>
+            </td>
+            <td class="py-3.5 px-4 font-mono text-xs text-slate-300">
+              <div class="flex items-center gap-1.5">
+                <span>${truncateAddress(t.destination, 4, 4)}</span>
+                <button type="button" class="touch-target w-7 h-7 text-slate-400 hover:text-white rounded transition flex items-center justify-center cursor-pointer" onclick="copyToClipboard('${t.destination}', 'Address')">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                </button>
+              </div>
+            </td>
+            <td class="py-3.5 px-4 text-slate-400 text-xs truncate max-w-[140px]">${t.note ? escapeHtml(t.note) : '<span class="text-slate-600">—</span>'}</td>
+            <td class="py-3.5 px-4">
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${badgeClass}">
+                ${icon}
+                ${statusLabel}
+              </span>
+            </td>
+            <td class="py-3.5 px-4 whitespace-nowrap">
+              <div class="flex items-center gap-2.5">
+                ${explorerHtml}
+                <button type="button"
+                        onclick="openTransferReceiptById(${t.id})"
+                        class="inline-flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 font-mono transition cursor-pointer"
+                        title="View Full Receipt">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                  <span>Receipt</span>
+                </button>
+              </div>
+            </td>
+          </tr>
         `;
-      } else if (t.status === 'pending') {
-        const explorerUrl = `https://solscan.io/account/${t.destination}`;
-        explorerHtml = `
-          <a href="${explorerUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 font-mono transition" title="View recipient address on Solscan">
-            <span>Escrow Hold</span>
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-          </a>
-        `;
-      }
+      }).join('');
+    }
 
-      const tLogo = tokenLogos[t.token] || tokenLogos.SOL;
+    // Build Mobile High-Conviction Compact Cards HTML
+    if (mobileList) {
+      mobileList.innerHTML = filtered.map(t => {
+        let badgeClass = 'badge-completed';
+        let statusLabel = 'Completed';
+        let icon = `<svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`;
 
-      return `
-        <tr class="border-b border-white/5 hover:bg-white/[0.02] transition text-sm">
-          <td class="py-3.5 px-4 text-slate-400 text-xs whitespace-nowrap">${dateStr}</td>
-          <td class="py-3.5 px-4">
-            <div class="flex items-center gap-1.5 font-semibold text-white">
-              <img src="${tLogo.url}" onerror="this.src='${tLogo.local}'" alt="${t.token}" class="w-4 h-4 rounded-full object-contain shrink-0">
-              <span>${formatAmount(t.amount, t.token === 'SOL' ? 4 : 2)} <span class="text-xs text-slate-400 font-normal">${t.token}</span></span>
+        if (t.status === 'cancelled') {
+          badgeClass = 'badge-cancelled';
+          statusLabel = 'Cancelled';
+          icon = `<svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>`;
+        } else if (t.status === 'failed') {
+          badgeClass = 'badge-failed';
+          statusLabel = 'Failed';
+          icon = `<svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`;
+        } else if (t.status === 'pending') {
+          badgeClass = 'badge-pending';
+          statusLabel = 'Pending Escrow';
+          icon = `<svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
+        } else if (t.status === 'processing') {
+          badgeClass = 'badge-processing';
+          statusLabel = 'Broadcasting';
+          icon = `<span class="spinner-sm inline-block"></span>`;
+        }
+
+        const dateStr = t.created_at ? new Date(t.created_at).toLocaleString('en-US', {
+          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        }) : 'Recent';
+
+        const tLogo = tokenLogos[t.token] || tokenLogos.SOL;
+
+        let explorerBtn = '';
+        if (t.tx_signature) {
+          explorerBtn = `
+            <a href="https://solscan.io/tx/${t.tx_signature}" target="_blank" rel="noopener noreferrer"
+               class="touch-target min-h-[44px] w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800/80 hover:bg-slate-700/80 text-purple-300 hover:text-white border border-white/10 transition cursor-pointer">
+              <svg class="w-3.5 h-3.5 text-purple-400" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              <span>Solscan ↗</span>
+            </a>
+          `;
+        } else if (t.status === 'pending') {
+          explorerBtn = `
+            <a href="https://solscan.io/account/${t.destination}" target="_blank" rel="noopener noreferrer"
+               class="touch-target min-h-[44px] w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 hover:text-white border border-amber-500/30 transition cursor-pointer">
+              <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              <span>In Escrow</span>
+            </a>
+          `;
+        } else {
+          explorerBtn = `
+            <span class="touch-target min-h-[44px] w-full inline-flex items-center justify-center text-xs text-slate-500 bg-slate-900/50 rounded-xl border border-white/5">
+              Settled Off-Chain
+            </span>
+          `;
+        }
+
+        return `
+          <div class="glass-panel glass-panel-hover rounded-2xl p-4 border border-white/10 space-y-3">
+            <!-- Top Row: Token, Amount, Status Badge -->
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <img src="${tLogo.url}" onerror="this.src='${tLogo.local}'" alt="${t.token}" class="w-7 h-7 rounded-full object-contain shrink-0 p-0.5 bg-black/40 border border-white/10">
+                <span class="font-mono text-base font-extrabold text-white">
+                  ${formatAmount(t.amount, t.token === 'SOL' ? 4 : 2)} <span class="text-xs text-slate-400 font-sans font-normal">${t.token}</span>
+                </span>
+              </div>
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${badgeClass}">
+                ${icon}
+                <span>${statusLabel}</span>
+              </span>
             </div>
-          </td>
-          <td class="py-3.5 px-4 font-mono text-xs text-slate-300">
-            <div class="flex items-center gap-1.5">
-              <span>${truncateAddress(t.destination, 4, 4)}</span>
-              <button type="button" class="text-slate-400 hover:text-white p-0.5 rounded transition" onclick="copyToClipboard('${t.destination}', 'Address')">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"/></svg>
+
+            <!-- Recipient Row with Copy Button (Touch target >= 44px) -->
+            <div class="flex items-center justify-between text-xs bg-slate-900/60 px-3 py-1.5 rounded-xl border border-white/5">
+              <div class="flex items-center gap-1.5 truncate">
+                <span class="text-slate-400">To:</span>
+                <span class="font-mono text-purple-300 font-semibold truncate" title="${t.destination}">${truncateAddress(t.destination, 6, 6)}</span>
+              </div>
+              <button type="button"
+                      class="touch-target w-10 h-10 min-w-[40px] min-h-[40px] text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition flex items-center justify-center cursor-pointer shrink-0"
+                      onclick="copyToClipboard('${t.destination}', 'Recipient Address')"
+                      title="Copy address">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
               </button>
             </div>
-          </td>
-          <td class="py-3.5 px-4 text-slate-400 text-xs truncate max-w-[140px]">${t.note ? escapeHtml(t.note) : '<span class="text-slate-600">—</span>'}</td>
-          <td class="py-3.5 px-4">
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${badgeClass}">
-              ${icon}
-              ${statusLabel}
-            </span>
-          </td>
-          <td class="py-3.5 px-4 whitespace-nowrap">
-            <div class="flex items-center gap-2.5">
-              ${explorerHtml}
+
+            <!-- Date & Memo -->
+            <div class="flex items-center justify-between text-[11px] text-slate-400 px-1">
+              <span>${dateStr}</span>
+              ${t.note ? `<span class="text-slate-300 truncate max-w-[150px]">“${escapeHtml(t.note)}”</span>` : ''}
+            </div>
+
+            <!-- Bottom Actions: Solscan Explorer & Receipt Buttons (>= 44px Touch Targets) -->
+            <div class="grid grid-cols-2 gap-2 pt-1 border-t border-white/5">
+              ${explorerBtn}
               <button type="button"
                       onclick="openTransferReceiptById(${t.id})"
-                      class="inline-flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 font-mono transition cursor-pointer"
-                      title="View Full Receipt">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                Receipt
+                      class="touch-target min-h-[44px] w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 hover:text-white border border-purple-500/30 transition cursor-pointer active:scale-95">
+                <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                <span>Receipt</span>
               </button>
             </div>
-          </td>
-        </tr>
-      `;
-    }).join('');
+          </div>
+        `;
+      }).join('');
+    }
   }
 
   // Setup History Filter & Search Listeners
@@ -1983,14 +2188,14 @@
 
       const badge = document.getElementById('keyStatusBadge');
       if (badge) {
-        badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse"></span><span>Encrypted in View</span>`;
+        badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span><span>Encrypted in View</span>`;
         badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-1';
       }
 
       const revealBtn = document.getElementById('revealCopyKeyBtn');
       if (revealBtn) {
         revealBtn.innerHTML = `
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
           <span>Reveal Private Key</span>
         `;
         revealBtn.className = 'w-full py-3 px-4 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 shadow-lg shadow-purple-600/25 flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer';
@@ -2034,14 +2239,14 @@
 
     const badge = document.getElementById('keyStatusBadge');
     if (badge) {
-      badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse"></span><span>Encrypted in View</span>`;
+      badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span><span>Encrypted in View</span>`;
       badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-1';
     }
 
     const revealBtn = document.getElementById('revealCopyKeyBtn');
     if (revealBtn) {
       revealBtn.innerHTML = `
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
         <span>Reveal Private Key</span>
       `;
       revealBtn.className = 'w-full py-3 px-4 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 shadow-lg shadow-purple-600/25 flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer';
@@ -2115,14 +2320,14 @@
 
         const badge = document.getElementById('keyStatusBadge');
         if (badge) {
-          badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse"></span><span>Encrypted in View</span>`;
+          badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span><span>Encrypted in View</span>`;
           badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-1';
         }
 
         const revealBtn = document.getElementById('revealCopyKeyBtn');
         if (revealBtn) {
           revealBtn.innerHTML = `
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
             <span>Reveal Private Key</span>
           `;
           revealBtn.className = 'w-full py-3 px-4 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 shadow-lg shadow-purple-600/25 flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer';
@@ -2166,7 +2371,7 @@
       }
       if (btn) {
         btn.innerHTML = `
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
           <span>Copy Private Key</span>
         `;
         btn.className = 'w-full py-3 px-4 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:to-teal-500 shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer';
@@ -2180,7 +2385,7 @@
           const originalHtml = btn.innerHTML;
           const originalClass = btn.className;
           btn.innerHTML = `
-            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
             <span>Copied to Clipboard!</span>
           `;
           btn.className = 'w-full py-3 px-4 rounded-xl font-bold text-xs text-white bg-emerald-500 shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2 transition-all duration-200';
@@ -2362,11 +2567,11 @@
           </td>
           <td class="py-3 px-3 font-mono text-slate-300 text-xs">
             <span title="${t.destination}">${shortDest}</span>
-            <button type="button" onclick="copyToClipboard('${t.destination}', 'Destination')" class="text-slate-500 hover:text-white ml-1">📋</button>
+            <button type="button" onclick="copyToClipboard('${t.destination}', 'Destination')" class="text-slate-500 hover:text-white ml-1 inline-flex items-center" title="Copy"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
           </td>
           <td class="py-3 px-3">
             <span class="inline-flex items-center gap-1 font-mono text-xs font-bold ${isUrgent ? 'text-rose-400' : 'text-amber-300'}">
-              ⏱ ${formatMMSS(remainingSec)}
+              <svg class="w-3 h-3 text-amber-400 inline shrink-0" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> ${formatMMSS(remainingSec)}
             </span>
           </td>
           <td class="py-3 px-3 text-right">
@@ -2492,7 +2697,7 @@
               </td>
               <td class="py-3 px-3 font-mono text-purple-300 text-xs">
                 <span>${shortDep}</span>
-                ${u.solana_deposit_address ? `<button type="button" onclick="copyToClipboard('${u.solana_deposit_address}', 'Deposit Address')" class="text-slate-500 hover:text-white ml-1">📋</button>` : ''}
+                ${u.solana_deposit_address ? `<button type="button" onclick="copyToClipboard('${u.solana_deposit_address}', 'Deposit Address')" class="text-slate-500 hover:text-white ml-1 inline-flex items-center" title="Copy"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>` : ''}
               </td>
               <td class="py-3 px-3 font-mono font-bold text-white text-xs">${formatAmount(u.sol_avail || 0, 4)} SOL</td>
               <td class="py-3 px-3 font-mono text-blue-300 text-xs">$${formatAmount(u.usdc_avail || 0, 2)}</td>
@@ -2594,6 +2799,7 @@
   async function init() {
     // 1. Setup tabs immediately so buttons are responsive right away
     try { setupTabs(); } catch (e) { console.error('setupTabs error:', e); }
+    try { initMobileDrawer(); } catch (e) { console.error('initMobileDrawer error:', e); }
 
     // 2. Synchronous SSR Hydration: immediately populate state from server bootstrap
     if (window.__INITIAL_STATE__) {
@@ -3019,4 +3225,127 @@
     }
   }
   window.submitTransferDevFees = submitTransferDevFees;
+
+  // =========================================================================
+  // Mobile Hamburger Menu & Slide-Over Drawer Controller
+  // Supporting #btnMobileMenu / #btnLandingMobileMenu & #mobileDrawer / #landingMobileDrawer
+  // =========================================================================
+  function initMobileDrawer() {
+    const btnMenu = document.getElementById('btnMobileMenu') || document.getElementById('btnLandingMobileMenu');
+    const drawerRoot = document.getElementById('mobileDrawer') || document.getElementById('landingMobileDrawer');
+    if (!btnMenu || !drawerRoot) return;
+
+    const drawerBackdrop = drawerRoot.querySelector('.mobile-drawer-backdrop') || document.getElementById('mobileDrawerBackdrop') || document.getElementById('landingMobileDrawerBackdrop');
+    const drawerPanel = drawerRoot.querySelector('.mobile-drawer-panel') || document.getElementById('mobileDrawerPanel') || document.getElementById('landingMobileDrawerPanel');
+    const drawerCloseBtns = drawerRoot.querySelectorAll('[data-drawer-close], .btn-drawer-close');
+
+    function openDrawer() {
+      drawerRoot.classList.add('is-open');
+      if (drawerBackdrop) drawerBackdrop.classList.add('is-open');
+      if (drawerPanel) drawerPanel.classList.add('is-open');
+      btnMenu.classList.add('is-active');
+      btnMenu.setAttribute('aria-expanded', 'true');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeDrawer() {
+      if (drawerPanel) drawerPanel.classList.remove('is-open');
+      if (drawerBackdrop) drawerBackdrop.classList.remove('is-open');
+      btnMenu.classList.remove('is-active');
+      btnMenu.setAttribute('aria-expanded', 'false');
+      document.body.style.overflow = '';
+      setTimeout(() => {
+        if (!btnMenu.classList.contains('is-active')) {
+          drawerRoot.classList.remove('is-open');
+        }
+      }, 350);
+    }
+
+    function toggleDrawer() {
+      const isOpen = drawerRoot.classList.contains('is-open') || btnMenu.classList.contains('is-active');
+      if (isOpen) {
+        closeDrawer();
+      } else {
+        openDrawer();
+      }
+    }
+
+    // Toggle button click listener
+    btnMenu.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleDrawer();
+    });
+
+    // Close button click listeners
+    drawerCloseBtns.forEach(b => {
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeDrawer();
+      });
+    });
+
+    // Click outside on backdrop
+    if (drawerBackdrop) {
+      drawerBackdrop.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeDrawer();
+      });
+    }
+
+    // ESC key closes drawer
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && (drawerRoot.classList.contains('is-open') || btnMenu.classList.contains('is-active'))) {
+        closeDrawer();
+      }
+    });
+
+    // All links/buttons inside drawer close the drawer when clicked
+    const drawerLinks = drawerRoot.querySelectorAll('a, button[data-tab-target], .drawer-nav-item');
+    drawerLinks.forEach(link => {
+      link.addEventListener('click', () => {
+        closeDrawer();
+      });
+    });
+
+    // Global handles
+    window.openMobileDrawer = openDrawer;
+    window.closeMobileDrawer = closeDrawer;
+    window.toggleMobileDrawer = toggleDrawer;
+  }
+  window.initMobileDrawer = initMobileDrawer;
+
+  function copyDrawerDepositAddress() {
+    const el = document.getElementById('drawerDepositAddressTruncated');
+    const feedback = document.getElementById('drawerCopyFeedback');
+    const full = el ? el.getAttribute('data-full') : '';
+    if (!full) return;
+
+    if (typeof copyToClipboard === 'function') {
+      copyToClipboard(full, 'Deposit Address');
+    } else {
+      navigator.clipboard.writeText(full);
+    }
+
+    if (feedback) {
+      const orig = feedback.textContent;
+      feedback.textContent = 'Copied!';
+      feedback.classList.add('text-emerald-400');
+      setTimeout(() => {
+        feedback.textContent = orig;
+        feedback.classList.remove('text-emerald-400');
+      }, 2000);
+    }
+  }
+  window.copyDrawerDepositAddress = copyDrawerDepositAddress;
+
+  function scrollToEscrowForm() {
+    const form = document.getElementById('transferForm') || document.getElementById('sendEscrowCard');
+    if (form) {
+      form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const amtInput = document.getElementById('amountInput');
+      if (amtInput) amtInput.focus();
+    }
+  }
+  window.scrollToEscrowForm = scrollToEscrowForm;
+
 })();

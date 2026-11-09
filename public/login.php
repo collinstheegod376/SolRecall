@@ -21,20 +21,28 @@ $success = $_SESSION['flash_success'] ?? null;
 unset($_SESSION['flash_error'], $_SESSION['flash_success']);
 ?>
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" class="dark overflow-x-hidden">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SolRecall - Reversible Time-Locked Escrow on Solana</title>
-  <link rel="icon" type="image/png" href="/assets/img/logo.png">
-  <link rel="apple-touch-icon" href="/assets/img/logo.png">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/img/apple-touch-icon.png">
   <!-- PWA & Mobile Meta Tags -->
   <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#07090e">
+  <meta name="theme-color" content="#000000">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="SolRecall">
+
+  <!-- Google Fonts: 7 Distinct Hierarchy Tiers -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cinzel:wght@600;700&family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600&family=Rajdhani:wght@600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -43,17 +51,34 @@ unset($_SESSION['flash_error'], $_SESSION['flash_success']);
       theme: {
         extend: {
           fontFamily: {
-            sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
-            mono: ['"JetBrains Mono"', '"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
-            display: ['"Space Grotesk"', 'Inter', 'sans-serif']
+            display: ['"Syne"', 'sans-serif'],
+            body: ['"Plus Jakarta Sans"', 'sans-serif'],
+            stats: ['"Bebas Neue"', 'sans-serif'],
+            crypto: ['"JetBrains Mono"', 'monospace'],
+            nav: ['"Rajdhani"', 'sans-serif'],
+            cta: ['"Outfit"', 'sans-serif'],
+            timelock: ['"Cinzel"', 'serif'],
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace']
           },
           colors: {
+            pitch: '#000000',
+            obsidian: {
+              DEFAULT: '#08080a',
+              light: '#0f0f13',
+              card: '#141418'
+            },
+            hairline: {
+              DEFAULT: '#222228',
+              light: '#2a2a34'
+            },
+            stealth: '#94949e',
             solana: {
               purple: '#9945FF',
               green: '#14F195',
-              dark: '#07090e',
-              card: '#0e1424',
-              border: '#1e293b'
+              dark: '#000000',
+              card: '#141418',
+              border: '#222228'
             }
           }
         }
@@ -61,15 +86,9 @@ unset($_SESSION['flash_error'], $_SESSION['flash_success']);
     }
   </script>
   <!-- Custom Styles -->
-  <link rel="stylesheet" href="/assets/css/style.css?v=<?= file_exists(__DIR__ . '/assets/css/style.css') ? filemtime(__DIR__ . '/assets/css/style.css') : '1.1' ?>">
+  <link rel="stylesheet" href="/assets/css/style.css?v=<?= file_exists(__DIR__ . '/assets/css/style.css') ? filemtime(__DIR__ . '/assets/css/style.css') : '2.0' ?>">
 </head>
-<body class="min-h-screen bg-[#07090e] text-slate-100 flex flex-col justify-between selection:bg-purple-500 selection:text-white">
-
-  <!-- Background decorative glows -->
-  <div class="fixed inset-0 overflow-hidden pointer-events-none z-0">
-    <div class="absolute -top-40 -left-40 w-96 h-96 bg-purple-600/15 rounded-full blur-[120px]"></div>
-    <div class="absolute -bottom-40 -right-40 w-96 h-96 bg-emerald-500/10 rounded-full blur-[120px]"></div>
-  </div>
+<body class="min-h-screen bg-[#000000] text-zinc-100 flex flex-col justify-between selection:bg-zinc-800 selection:text-white font-body">
 
   <!-- Main Container -->
   <div class="relative z-10 flex-1 flex flex-col items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
@@ -78,30 +97,30 @@ unset($_SESSION['flash_error'], $_SESSION['flash_success']);
       <!-- Brand Header -->
       <div class="text-center">
         <a href="/" class="inline-flex items-center justify-center gap-3 group">
-          <img src="/assets/img/logo.png" alt="SolRecall Logo" class="w-14 h-14 rounded-2xl shadow-xl shadow-purple-500/20 border border-purple-500/30 group-hover:scale-105 transition-transform duration-200 object-cover">
+          <img src="/assets/img/logo.png" alt="SolRecall Logo" class="w-14 h-14 rounded-2xl border border-[#222228] shadow-2xl group-hover:scale-105 transition-transform duration-200 object-cover">
         </a>
-        <h1 class="mt-4 text-3xl font-extrabold tracking-tight text-white">
+        <h1 class="mt-4 text-3xl font-extrabold tracking-tight text-white font-display">
           Welcome back
         </h1>
-        <p class="mt-2 text-sm text-slate-400">
-          Sign in to your <span class="text-white font-medium">SolRecall</span> account
+        <p class="mt-2 text-sm text-[#94949e] font-body">
+          Sign in to your <span class="text-white font-medium">SolRecall</span> escrow account
         </p>
       </div>
 
       <!-- Auth Card -->
-      <div class="glass-panel rounded-3xl p-8 border border-white/10 shadow-2xl shadow-black/50 relative">
+      <div class="glass-panel rounded-3xl p-8 border border-[#222228] shadow-2xl relative bg-[#141418]/85 backdrop-blur-xl">
 
         <!-- Error / Success Alert -->
         <?php if ($error): ?>
-          <div class="mb-5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
-            <svg class="w-4 h-4 shrink-0 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          <div class="mb-5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2 font-body">
+            <svg class="w-4 h-4 shrink-0 text-rose-400" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             <span><?= htmlspecialchars($error) ?></span>
           </div>
         <?php endif; ?>
 
         <?php if ($success): ?>
-          <div class="mb-5 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
-            <svg class="w-4 h-4 shrink-0 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          <div class="mb-5 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2 font-body">
+            <svg class="w-4 h-4 shrink-0 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
             <span><?= htmlspecialchars($success) ?></span>
           </div>
         <?php endif; ?>
@@ -109,7 +128,7 @@ unset($_SESSION['flash_error'], $_SESSION['flash_success']);
         <!-- Email & Password Form -->
         <form action="/api/auth/login" method="POST" id="loginForm" class="space-y-4">
           <div>
-            <label for="email" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+            <label for="email" class="block text-xs font-bold uppercase tracking-wider text-[#94949e] mb-1.5 font-nav">
               Email or Username
             </label>
             <input type="text"
@@ -118,15 +137,15 @@ unset($_SESSION['flash_error'], $_SESSION['flash_success']);
                    required
                    autocomplete="username"
                    placeholder="jane@example.com or Jane Doe"
-                   class="w-full px-4 py-2.5 rounded-xl bg-slate-900/90 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 text-sm transition">
+                   class="w-full px-4 py-2.5 rounded-xl bg-[#08080a] border border-[#222228] text-white placeholder-[#71717a] focus:outline-none focus:border-[#3f3f4c] text-sm transition font-body">
           </div>
 
           <div>
             <div class="flex items-center justify-between mb-1.5">
-              <label for="password" class="block text-xs font-semibold uppercase tracking-wider text-slate-300">
+              <label for="password" class="block text-xs font-bold uppercase tracking-wider text-[#94949e] font-nav">
                 Password
               </label>
-              <a href="#" onclick="showToast('Password reset link has been dispatched to email if registered', 'info'); return false;" class="text-xs text-purple-400 hover:text-purple-300 transition">Forgot password?</a>
+              <a href="#" onclick="showToast('Password reset link has been dispatched to email if registered', 'info'); return false;" class="text-xs text-white hover:text-zinc-300 transition font-body">Forgot password?</a>
             </div>
             <div class="relative">
               <input type="password"
@@ -135,34 +154,34 @@ unset($_SESSION['flash_error'], $_SESSION['flash_success']);
                      required
                      autocomplete="current-password"
                      placeholder="••••••••••••"
-                     class="w-full px-4 py-2.5 rounded-xl bg-slate-900/90 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 text-sm transition pr-10">
+                     class="w-full px-4 py-2.5 rounded-xl bg-[#08080a] border border-[#222228] text-white placeholder-[#71717a] focus:outline-none focus:border-[#3f3f4c] text-sm transition pr-10 font-body">
               <button type="button"
                       id="togglePassword"
-                      class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-200">
-                <svg id="eyeIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                      class="absolute inset-y-0 right-0 pr-3 flex items-center text-[#71717a] hover:text-white">
+                <svg id="eyeIcon" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
               </button>
             </div>
           </div>
 
           <div class="flex items-center justify-between pt-1">
             <label class="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" name="remember" class="w-4 h-4 rounded bg-slate-900 border-white/10 text-purple-600 focus:ring-purple-500 focus:ring-offset-0">
-              <span class="text-xs text-slate-400">Remember this device</span>
+              <input type="checkbox" name="remember" class="w-4 h-4 rounded bg-[#08080a] border-[#222228] text-zinc-100 focus:ring-0 focus:ring-offset-0">
+              <span class="text-xs text-[#94949e] font-body">Remember this device</span>
             </label>
           </div>
 
           <button type="submit"
                   id="submitBtn"
-                  class="w-full mt-2 py-3 px-4 rounded-xl font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 border border-purple-400/30 shadow-lg shadow-purple-600/20 transition-all duration-200 flex items-center justify-center gap-2 text-sm">
-            <span id="submitSpinner" class="hidden spinner-sm"></span>
+                  class="w-full mt-2 py-3 px-4 rounded-xl font-bold text-black bg-white hover:bg-zinc-200 border border-white transition-all duration-200 flex items-center justify-center gap-2 text-sm font-cta cursor-pointer shadow-lg shadow-white/5 active:scale-95">
+            <span id="submitSpinner" class="hidden spinner-sm !border-t-black !border-black/20"></span>
             <span id="submitBtnText">Sign In</span>
           </button>
         </form>
 
         <!-- Switch to Register -->
-        <p class="mt-6 text-center text-xs text-slate-400">
+        <p class="mt-6 text-center text-xs text-[#94949e] font-body">
           Don't have an account yet?
-          <a href="/register" class="font-semibold text-purple-400 hover:text-purple-300 ml-1 transition">
+          <a href="/register" class="font-bold text-white hover:underline ml-1 transition">
             Create an account &rarr;
           </a>
         </p>
@@ -171,17 +190,17 @@ unset($_SESSION['flash_error'], $_SESSION['flash_success']);
 
       <!-- Feature Badges -->
       <div class="grid grid-cols-3 gap-2 text-center pt-2">
-        <div class="p-2 rounded-xl bg-white/[0.02] border border-white/5">
-          <div class="text-amber-400 text-xs font-semibold">5-15 Min Hold</div>
-          <div class="text-[10px] text-slate-400">Undo small mistakes</div>
+        <div class="p-2.5 rounded-xl bg-[#08080a] border border-[#222228]">
+          <div class="text-amber-400 text-xs font-bold font-timelock tracking-wider">5-15 MIN HOLD</div>
+          <div class="text-[10px] text-[#94949e] font-body">Undo small mistakes</div>
         </div>
-        <div class="p-2 rounded-xl bg-white/[0.02] border border-white/5">
-          <div class="text-emerald-400 text-xs font-semibold">SOL • USDC • USDT</div>
-          <div class="text-[10px] text-slate-400">Multi-token escrow</div>
+        <div class="p-2.5 rounded-xl bg-[#08080a] border border-[#222228]">
+          <div class="text-emerald-400 text-xs font-bold font-timelock tracking-wider">SOL • USDC • USDT</div>
+          <div class="text-[10px] text-[#94949e] font-body">Multi-token escrow</div>
         </div>
-        <div class="p-2 rounded-xl bg-white/[0.02] border border-white/5">
-          <div class="text-purple-400 text-xs font-semibold">Self-Custodial Key</div>
-          <div class="text-[10px] text-slate-400">Full export control</div>
+        <div class="p-2.5 rounded-xl bg-[#08080a] border border-[#222228]">
+          <div class="text-white text-xs font-bold font-timelock tracking-wider">SELF-CUSTODIAL</div>
+          <div class="text-[10px] text-[#94949e] font-body">Full export control</div>
         </div>
       </div>
 
@@ -189,8 +208,8 @@ unset($_SESSION['flash_error'], $_SESSION['flash_success']);
   </div>
 
   <!-- Brand Footer -->
-  <footer class="relative z-10 py-6 text-center text-xs text-slate-500">
-    SolRecall &copy; <?= date('Y') ?> &bull; Reversible Time-Locked Escrow on Solana
+  <footer class="relative z-10 py-6 text-center text-xs text-[#71717a] font-nav tracking-wider">
+    SOLRECALL PROTOCOL &bull; MAINNET V2.0 &bull; REVERSIBLE TIME-LOCKED ESCROW
   </footer>
 
   <!-- Toast Container -->
@@ -212,7 +231,6 @@ unset($_SESSION['flash_error'], $_SESSION['flash_success']);
     const loginForm = document.getElementById('loginForm');
     if (loginForm) {
       loginForm.addEventListener('submit', async (e) => {
-        // If standalone frontend without backend running, allow demo login
         e.preventDefault();
         const email = document.getElementById('email').value;
         const password = document.getElementById('password').value;

@@ -3,12 +3,19 @@
  * Reversible Time-Locked Escrow on Solana
  */
 
-const CACHE_NAME = 'solrecall-v4';
+const CACHE_NAME = 'solrecall-v5';
 
 const STATIC_SHELL_ASSETS = [
   '/manifest.json',
+  '/favicon.ico',
+  '/apple-touch-icon.png',
   '/assets/img/logo.png',
-  '/assets/img/logo.jpg',
+  '/assets/img/logo-transparent.png',
+  '/assets/img/logo.svg',
+  '/assets/img/icon-192.png',
+  '/assets/img/icon-512.png',
+  '/assets/img/apple-touch-icon.png',
+  '/assets/img/favicon-32.png',
   '/assets/img/sol.png',
   '/assets/img/usdc.png',
   '/assets/img/usdt.png',
